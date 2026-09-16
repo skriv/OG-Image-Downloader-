@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OG Downloader</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div>
+          <div class="brand">OG Downloader</div>
+          <div class="host" id="host">—</div>
+        </div>
+        <button class="text-btn" id="refresh" type="button">Обновить</button>
+      </header>
+
+      <section class="panel" id="state-loading" hidden>
+        <p class="muted">Читаю мета-теги страницы…</p>
+      </section>
+
+      <section class="panel" id="state-restricted" hidden>
+        <p class="title">Расширение здесь недоступно</p>
+        <p class="muted">
+          Откройте обычный сайт по HTTP или HTTPS и нажмите иконку снова.
+        </p>
+      </section>
+
+      <section class="panel" id="state-error" hidden>
+        <p class="title" id="error-title">Не удалось прочитать страницу</p>
+        <p class="muted" id="error-text"></p>
+        <button class="btn btn-secondary" id="error-retry" type="button">Повторить</button>
+      </section>
+
+      <section class="panel" id="state-empty" hidden>
+        <p class="title">На этой странице нет OG-картинки</p>
+        <p class="muted">
+          Нет <code>og:image</code>, Twitter Card и запасных тегов. Если это SPA,
+          дождитесь загрузки и нажмите «Обновить».
+        </p>
+      </section>
+
+      <section id="state-content" hidden>
+        <div class="preview" id="preview">
+          <img id="preview-img" alt="OG image preview" referrerpolicy="no-referrer" />
+          <div class="preview-error" id="preview-error" hidden>
+            <p>Картинка не загрузилась</p>
+            <button class="text-btn" id="preview-retry" type="button">Повторить</button>
+            <p class="url-raw" id="preview-url"></p>
+          </div>
+          <div class="badge" id="badge"></div>
+        </div>
+
+        <h1 class="page-title" id="title"></h1>
+        <p class="page-desc" id="description"></p>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="download" type="button">Скачать</button>
+          <button class="btn btn-secondary" id="copy" type="button">Копировать URL</button>
+          <button class="btn btn-secondary" id="open" type="button">Открыть</button>
+        </div>
+
+        <div class="thumbs-wrap" id="thumbs-wrap" hidden>
+          <div class="thumbs-label">Другие картинки</div>
+          <div class="thumbs" id="thumbs"></div>
+        </div>
+      </section>
+
+      <p class="status" id="status" hidden></p>
+    </div>
+
+    <script src="extract.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

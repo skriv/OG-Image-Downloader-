@@ -4,7 +4,13 @@ import {
   Button,
   Card,
   Chip,
-  Spinner
+  ScrollShadow,
+  Spinner,
+  Surface,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography
 } from "@heroui/react";
 import {
   buildFilename,
@@ -16,10 +22,11 @@ import {
 } from "../shared/extract.js";
 import { useI18n } from "./i18n.jsx";
 import { SettingsButton } from "./SettingsButton.jsx";
-import { RefreshIcon } from "./icons.jsx";
+import { CopyIcon, OpenIcon, RefreshIcon } from "./icons.jsx";
 import { PreviewImage } from "./components/PreviewImage.jsx";
 import { Gallery } from "./components/Gallery.jsx";
-import { buildBadgeText, sourceLabel } from "./preview.js";
+import { LoadingSkeleton } from "./components/LoadingSkeleton.jsx";
+import { buildBadgeText, fetchSvgMarkup, sourceLabel } from "./preview.js";
 
 function sendMessage(payload) {
   return new Promise((resolve) => {
@@ -34,8 +41,9 @@ function sendMessage(payload) {
 }
 
 export default function App() {
-  const { t, ready } = useI18n();
+  const { t } = useI18n();
   const [view, setView] = useState("loading");
+  const [loadingStep, setLoadingStep] = useState("meta");
   const [host, setHost] = useState("—");
   const [data, setData] = useState(null);
   const [index, setIndex] = useState(0);
@@ -55,6 +63,8 @@ export default function App() {
   const image = data && data.images && data.images.length ? data.images[index] || data.images[0] : null;
   const pageImages = (data && data.pageImages) || [];
   const showGallery = (view === "empty" || view === "content") && pageImages.length > 0;
+  const isDownloading =
+    status && (status.key === "downloading" || status.key === "downloadingProgress");
 
   const badge = useMemo(
     () => buildBadgeText(image, probe, natural, extensionFromMime, extensionFromUrl),
@@ -102,6 +112,7 @@ export default function App() {
     setErrorText("");
     setGalleryFilter("all");
     setGallerySelected(Object.create(null));
+    setLoadingStep("meta");
     setView("loading");
 
     let tabs;
@@ -131,6 +142,8 @@ export default function App() {
       setView("restricted");
       return;
     }
+
+    setLoadingStep("scan");
 
     let results;
     try {
@@ -166,9 +179,8 @@ export default function App() {
   }, [setStatusMsg]);
 
   useEffect(() => {
-    if (!ready) return;
     loadPage();
-  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadPage]);
 
   useEffect(() => {
     function onMessage(message) {
@@ -219,17 +231,35 @@ export default function App() {
 
   async function copySelected() {
     if (!image) return;
+    await copyImageUrl(image.url);
+  }
+
+  function openSelected() {
+    if (!image) return;
+    openImageUrl(image.url);
+  }
+
+  async function copyImageUrl(url) {
     try {
-      await navigator.clipboard.writeText(image.url);
+      await navigator.clipboard.writeText(url);
       setStatusMsg("urlCopied");
     } catch (err) {
       setStatusMsg("copyFailed", true);
     }
   }
 
-  function openSelected() {
-    if (!image) return;
-    chrome.tabs.create({ url: image.url });
+  async function copySvgMarkup(image) {
+    try {
+      const markup = await fetchSvgMarkup(image);
+      await navigator.clipboard.writeText(markup);
+      setStatusMsg("svgCopied");
+    } catch (err) {
+      setStatusMsg("copySvgFailed", true);
+    }
+  }
+
+  function openImageUrl(url) {
+    chrome.tabs.create({ url });
   }
 
   function zipName() {
@@ -305,20 +335,26 @@ export default function App() {
     });
   }
 
-  if (!ready) {
-    return (
-      <div className="flex min-h-24 items-center justify-center p-3">
-        <Spinner size="sm" />
-      </div>
-    );
+  function unselectAll(filtered) {
+    setGallerySelected((prev) => {
+      const next = Object.assign(Object.create(null), prev);
+      filtered.forEach((item) => {
+        delete next[item.url];
+      });
+      return next;
+    });
   }
+
+  const loadingMessage = loadingStep === "scan" ? t("loadingScanning") : t("loading");
 
   return (
     <div className="flex flex-col gap-3 p-3">
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-semibold">OG Downloader</div>
-          <div className="text-muted text-sm break-all">{host}</div>
+          <Typography weight="semibold">OG Downloader</Typography>
+          <Typography.Paragraph color="muted" size="sm" className="break-all">
+            {host}
+          </Typography.Paragraph>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button
@@ -334,14 +370,7 @@ export default function App() {
         </div>
       </header>
 
-      {view === "loading" ? (
-        <Card>
-          <Card.Content className="flex items-center gap-2 py-4">
-            <Spinner size="sm" />
-            <span className="text-muted">{t("loading")}</span>
-          </Card.Content>
-        </Card>
-      ) : null}
+      {view === "loading" ? <LoadingSkeleton message={loadingMessage} /> : null}
 
       {view === "restricted" ? (
         <Card>
@@ -368,97 +397,150 @@ export default function App() {
         </Card>
       ) : null}
 
-      {view === "empty" ? (
-        <Card>
-          <Card.Header>
-            <Card.Title>{t("emptyTitle")}</Card.Title>
-            <Card.Description>
-              <span dangerouslySetInnerHTML={{ __html: t("emptyBody") }} />
-            </Card.Description>
-          </Card.Header>
-        </Card>
-      ) : null}
-
-      {view === "content" && image ? (
+      {view === "empty" || view === "content" ? (
         <section className="flex flex-col gap-3">
-          <Card>
-            <Card.Content className="relative p-0 overflow-hidden">
-              {!previewBroken ? (
-                <PreviewImage
-                  key={previewKey}
-                  image={image}
-                  alt={image.alt || (data && data.title) || t("previewAlt")}
-                  className="max-h-52 w-full object-contain"
-                  onLoad={(event) => {
-                    setPreviewBroken(false);
-                    if (event.currentTarget.naturalWidth) {
-                      setNatural({
-                        width: event.currentTarget.naturalWidth,
-                        height: event.currentTarget.naturalHeight
-                      });
-                    }
-                  }}
-                  onError={() => setPreviewBroken(true)}
-                />
-              ) : (
-                <div className="flex flex-col gap-2 p-4">
-                  <p>{t("previewFailed")}</p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onPress={() => {
+          <Card className="gap-0 overflow-hidden p-0">
+            <Card.Content className="relative gap-0 overflow-hidden p-0">
+              <Surface variant="secondary" className="og-preview-frame rounded-none">
+                {image && !previewBroken ? (
+                  <PreviewImage
+                    key={previewKey}
+                    image={image}
+                    alt={image.alt || (data && data.title) || t("previewAlt")}
+                    className="h-full w-full object-contain"
+                    onLoad={(event) => {
                       setPreviewBroken(false);
-                      setPreviewKey((k) => k + 1);
+                      if (event.currentTarget.naturalWidth) {
+                        setNatural({
+                          width: event.currentTarget.naturalWidth,
+                          height: event.currentTarget.naturalHeight
+                        });
+                      }
                     }}
-                  >
-                    {t("previewRetry")}
-                  </Button>
-                  <p className="text-muted text-sm break-all">{image.url}</p>
-                </div>
-              )}
-              {badge ? (
+                    onError={() => setPreviewBroken(true)}
+                  />
+                ) : image && previewBroken ? (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center">
+                    <Typography.Paragraph size="sm">{t("previewFailed")}</Typography.Paragraph>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setPreviewBroken(false);
+                        setPreviewKey((k) => k + 1);
+                      }}
+                    >
+                      {t("previewRetry")}
+                    </Button>
+                    <Typography.Paragraph color="muted" size="xs" className="break-all">
+                      {image.url}
+                    </Typography.Paragraph>
+                  </div>
+                ) : (
+                  <Typography.Paragraph color="muted" size="sm">
+                    {t("noOgPreview")}
+                  </Typography.Paragraph>
+                )}
+              </Surface>
+              {image && !previewBroken && badge ? (
                 <Chip size="sm" variant="soft" className="absolute bottom-2 left-2 max-w-[90%]">
                   <Chip.Label className="truncate">{badge}</Chip.Label>
                 </Chip>
               ) : null}
             </Card.Content>
+
+            {view === "content" && data && (data.title || data.description) ? (
+              <Card.Header className="gap-0.5 px-3 pt-2.5 pb-0">
+                {data.title ? (
+                  <Card.Title className="line-clamp-2 text-sm leading-snug">{data.title}</Card.Title>
+                ) : null}
+                {data.description ? (
+                  <Card.Description className="line-clamp-2 text-xs leading-5">
+                    {data.description}
+                  </Card.Description>
+                ) : null}
+              </Card.Header>
+            ) : null}
+
+            {view === "content" && data && image ? (
+              <Card.Footer className="flex w-full items-center gap-2 px-3 py-2.5">
+                <Button
+                  fullWidth
+                  size="md"
+                  className="flex-1"
+                  isDisabled={locked}
+                  onPress={downloadSelected}
+                >
+                  {t("download")}
+                </Button>
+                <Tooltip delay={300}>
+                  <Button
+                    isIconOnly
+                    size="md"
+                    variant="secondary"
+                    className="shrink-0"
+                    isDisabled={locked}
+                    aria-label={t("tooltipCopy")}
+                    onPress={copySelected}
+                  >
+                    <CopyIcon className="size-4" />
+                  </Button>
+                  <Tooltip.Content>
+                    {t("tooltipCopy")}
+                  </Tooltip.Content>
+                </Tooltip>
+                <Tooltip delay={300}>
+                  <Button
+                    isIconOnly
+                    size="md"
+                    variant="secondary"
+                    className="shrink-0"
+                    isDisabled={locked}
+                    aria-label={t("tooltipOpen")}
+                    onPress={openSelected}
+                  >
+                    <OpenIcon className="size-4" />
+                  </Button>
+                  <Tooltip.Content>
+                    {t("tooltipOpen")}
+                  </Tooltip.Content>
+                </Tooltip>
+              </Card.Footer>
+            ) : null}
           </Card>
 
-          {data.title ? <h1 className="font-semibold leading-snug">{data.title}</h1> : null}
-          {data.description ? (
-            <p className="text-muted text-sm line-clamp-3">{data.description}</p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" isDisabled={locked} onPress={downloadSelected}>
-              {t("download")}
-            </Button>
-            <Button size="sm" variant="secondary" isDisabled={locked} onPress={copySelected}>
-              {t("copyUrl")}
-            </Button>
-            <Button size="sm" variant="secondary" isDisabled={locked} onPress={openSelected}>
-              {t("open")}
-            </Button>
-          </div>
-
-          {data.images.length > 1 ? (
+          {view === "content" && data && data.images.length > 1 ? (
             <div className="flex flex-col gap-2">
-              <div className="text-muted text-sm">{t("otherImages")}</div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {data.images.map((item, i) => (
-                  <Button
-                    key={item.url + i}
-                    isIconOnly
-                    size="lg"
-                    variant={i === index ? "primary" : "secondary"}
-                    aria-label={sourceLabel(item.source)}
-                    className="h-14 w-14 overflow-hidden p-0"
-                    onPress={() => selectImage(i)}
-                  >
-                    <PreviewImage image={item} className="h-full w-full object-cover" />
-                  </Button>
-                ))}
-              </div>
+              <Typography.Paragraph color="muted" size="sm">
+                {t("otherImages")}
+              </Typography.Paragraph>
+              <ScrollShadow orientation="horizontal" className="max-w-full pb-1">
+                <ToggleButtonGroup
+                  selectionMode="single"
+                  disallowEmptySelection
+                  isDetached
+                  selectedKeys={new Set([String(index)])}
+                  onSelectionChange={(keys) => {
+                    const next = Array.from(keys)[0];
+                    if (next != null) selectImage(Number(next));
+                  }}
+                  className="flex w-max gap-2"
+                  aria-label={t("otherImages")}
+                >
+                  {data.images.map((item, i) => (
+                    <ToggleButton
+                      key={item.url + i}
+                      id={String(i)}
+                      isIconOnly
+                      size="lg"
+                      aria-label={sourceLabel(item.source)}
+                      className="h-14 w-14 overflow-hidden p-0"
+                    >
+                      <PreviewImage image={item} className="h-full w-full object-cover" />
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </ScrollShadow>
             </div>
           ) : null}
         </section>
@@ -472,8 +554,12 @@ export default function App() {
           selected={gallerySelected}
           onToggle={toggleSelected}
           onSelectAll={selectAll}
+          onUnselectAll={unselectAll}
           onDownload={(filtered) => downloadGalleryItems(filtered, false)}
           onDownloadZip={(filtered) => downloadGalleryItems(filtered, true)}
+          onOpenImage={openImageUrl}
+          onCopyLink={copyImageUrl}
+          onCopySvg={copySvgMarkup}
           busy={locked}
         />
       ) : null}
@@ -483,11 +569,18 @@ export default function App() {
           status={
             status.isError
               ? "danger"
-              : status.key === "downloading" || status.key === "downloadingProgress"
-                ? "default"
+              : isDownloading
+                ? "accent"
                 : "success"
           }
         >
+          {isDownloading ? (
+            <Alert.Indicator>
+              <Spinner size="sm" />
+            </Alert.Indicator>
+          ) : (
+            <Alert.Indicator />
+          )}
           <Alert.Content>
             <Alert.Description>
               {status.raw || t(status.key, status.vars)}

@@ -5,29 +5,74 @@ import { extractOpenGraph, buildFilename, isRestrictedUrl } from "./shared/extra
 import { buildZip } from "./shared/zip.js";
 
 var MENU_ID = "download-og-image";
+var menuQueue = Promise.resolve();
 
 function createMenu() {
-  chrome.contextMenus.removeAll(function () {
-    chrome.contextMenus.create({
-      id: MENU_ID,
-      title: t("contextMenuDownload"),
-      contexts: ["page", "action"]
+  menuQueue = menuQueue.then(function () {
+    return new Promise(function (resolve) {
+      chrome.contextMenus.removeAll(function () {
+        chrome.contextMenus.create(
+          {
+            id: MENU_ID,
+            title: t("contextMenuDownload"),
+            contexts: ["page", "action"]
+          },
+          function () {
+            void chrome.runtime.lastError;
+            resolve();
+          }
+        );
+      });
     });
   });
+  return menuQueue;
+}
+
+function updateMenuTitle() {
+  menuQueue = menuQueue.then(function () {
+    return new Promise(function (resolve) {
+      chrome.contextMenus.update(
+        MENU_ID,
+        { title: t("contextMenuDownload") },
+        function () {
+          if (chrome.runtime.lastError) {
+            chrome.contextMenus.create(
+              {
+                id: MENU_ID,
+                title: t("contextMenuDownload"),
+                contexts: ["page", "action"]
+              },
+              function () {
+                void chrome.runtime.lastError;
+                resolve();
+              }
+            );
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+  });
+  return menuQueue;
 }
 
 function loadLocaleAndMenu() {
-  loadLocale().then(createMenu);
+  return loadLocale().then(createMenu);
+}
+
+function ensureLocaleAndMenu() {
+  return loadLocale().then(updateMenuTitle);
 }
 
 chrome.runtime.onInstalled.addListener(loadLocaleAndMenu);
-chrome.runtime.onStartup.addListener(loadLocaleAndMenu);
-loadLocaleAndMenu();
+chrome.runtime.onStartup.addListener(ensureLocaleAndMenu);
+ensureLocaleAndMenu();
 
 chrome.storage.onChanged.addListener(function (changes, area) {
   if (area !== "local" || !changes.locale) return;
   setCurrentLocale(changes.locale.newValue);
-  createMenu();
+  updateMenuTitle();
 });
 
 function blobToDataUrl(blob) {

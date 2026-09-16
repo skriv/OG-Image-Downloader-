@@ -3,3 +3,8 @@ dist/
 .DS_Store
 *.log
 .vite/
+# heroui-agents-md
+.heroui-docs/
+store/.venv/
+store/captures/
+

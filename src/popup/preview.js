@@ -8,7 +8,7 @@ export function isSvgImage(image) {
   return url.indexOf("data:image/svg+xml") === 0 || /\.svg(?:$|[?#])/i.test(url);
 }
 
-function decodeSvgMarkup(url) {
+export function decodeSvgMarkup(url) {
   if (!url || url.indexOf("data:image/svg+xml") !== 0) return null;
   var comma = url.indexOf(",");
   if (comma < 0) return null;
@@ -21,6 +21,16 @@ function decodeSvgMarkup(url) {
   } catch (err) {
     return null;
   }
+}
+
+export function fetchSvgMarkup(image) {
+  if (!image || !image.url) return Promise.reject(new Error("missing"));
+  var local = decodeSvgMarkup(image.url);
+  if (local) return Promise.resolve(local);
+  return fetch(image.url).then(function (res) {
+    if (!res.ok) return Promise.reject(new Error("fetch"));
+    return res.text();
+  });
 }
 
 function svgHasCurrentColor(markup) {

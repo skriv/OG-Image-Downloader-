@@ -1,15 +1,15 @@
+import { useMemo, useState } from "react";
 import {
-  Accordion,
   Button,
-  ButtonGroup,
-  Checkbox,
-  Chip,
-  Dropdown,
-  Label
+  Card,
+  Disclosure,
+  Tag,
+  TagGroup,
+  Tooltip
 } from "@heroui/react";
-import { PreviewImage } from "./PreviewImage.jsx";
 import { FILTER_I18N, FILTER_ORDER } from "../preview.js";
 import { useI18n } from "../i18n.jsx";
+import { GalleryImageCell } from "./GalleryImageCell.jsx";
 
 export function Gallery({
   pageImages,
@@ -18,162 +18,158 @@ export function Gallery({
   selected,
   onToggle,
   onSelectAll,
+  onUnselectAll,
   onDownload,
   onDownloadZip,
+  onOpenImage,
+  onCopyLink,
+  onCopySvg,
   busy
 }) {
   const { t } = useI18n();
-  const types = FILTER_ORDER.filter((type) =>
-    pageImages.some((image) => image.type === type)
-  );
+  const [isOpen, setIsOpen] = useState(false);
+  const typeCounts = useMemo(() => {
+    const counts = Object.create(null);
+    pageImages.forEach((image) => {
+      const type = image.type || "unknown";
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    return counts;
+  }, [pageImages]);
+  const types = FILTER_ORDER.filter((type) => typeCounts[type] > 0);
   const activeFilter = filter !== "all" && types.indexOf(filter) === -1 ? "all" : filter;
   const filtered =
     activeFilter === "all"
       ? pageImages
       : pageImages.filter((image) => image.type === activeFilter);
   const selectedCount = filtered.filter((image) => selected[image.url]).length;
+  const hasSelection = selectedCount > 0;
   const downloadLabel = selectedCount
     ? t("downloadCount", { count: selectedCount })
     : t("downloadAll");
 
+  function handleSelectToggle() {
+    if (busy) return;
+    if (hasSelection) onUnselectAll(filtered);
+    else onSelectAll(filtered);
+  }
+
+  function handleFilterChange(keys) {
+    if (keys === "all") {
+      onFilterChange("all");
+      return;
+    }
+    const next = Array.from(keys)[0];
+    if (next) onFilterChange(String(next));
+  }
+
   return (
-    <Accordion className="w-full" variant="surface">
-      <Accordion.Item id="gallery">
-        <Accordion.Heading>
-          <Accordion.Trigger>
-            <span className="flex-1 text-left">
-              {t("allImages")}{" "}
-              <span className="text-muted">({pageImages.length})</span>
-            </span>
-            <Accordion.Indicator />
-          </Accordion.Trigger>
-        </Accordion.Heading>
-        <Accordion.Panel>
-          <Accordion.Body className="flex flex-col gap-3">
-            <div className="flex items-center justify-end">
-              <Button
-                size="sm"
-                variant="ghost"
-                isDisabled={busy}
-                onPress={() => onSelectAll(filtered)}
-              >
-                {t("selectAll")}
-              </Button>
-            </div>
+    <Card className="gap-0 overflow-hidden p-0">
+      <Disclosure isExpanded={isOpen} onExpandedChange={setIsOpen}>
+        <Card.Header className="p-0">
+          <Disclosure.Heading className="w-full">
+            <Button
+              slot="trigger"
+              variant="ghost"
+              className="h-auto w-full justify-between rounded-none px-3 py-2 font-medium shadow-none"
+            >
+              <Card.Title className="min-w-0 flex-1 truncate text-left text-sm leading-5">
+                {t("allImages")}{" "}
+                <span className="text-muted font-normal">({pageImages.length})</span>
+              </Card.Title>
+              <Disclosure.Indicator className="text-muted" />
+            </Button>
+          </Disclosure.Heading>
+        </Card.Header>
 
-            {types.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                <Chip
-                  size="sm"
-                  variant={activeFilter === "all" ? "primary" : "secondary"}
-                  className="cursor-pointer"
-                  onClick={() => onFilterChange("all")}
-                >
-                  <Chip.Label>{t("filterAll")}</Chip.Label>
-                </Chip>
-                {types.map((type) => (
-                  <Chip
-                    key={type}
+        <Disclosure.Content>
+          <Card.Content className="gap-3 border-t border-separator px-3 pb-3 pt-2.5">
+            <Disclosure.Body className="flex flex-col gap-3 p-0">
+              <div className="flex items-start gap-2">
+                {types.length > 0 ? (
+                  <TagGroup
                     size="sm"
-                    variant={activeFilter === type ? "primary" : "secondary"}
-                    className="cursor-pointer"
-                    onClick={() => onFilterChange(type)}
+                    selectionMode="single"
+                    selectedKeys={new Set([activeFilter])}
+                    onSelectionChange={handleFilterChange}
+                    className="min-w-0 flex-1"
+                    aria-label={t("allImages")}
                   >
-                    <Chip.Label>{t(FILTER_I18N[type])}</Chip.Label>
-                  </Chip>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-3 gap-2">
-              {filtered.map((image) => {
-                const checked = Boolean(selected[image.url]);
-                return (
-                  <div
-                    key={image.url}
-                    role="button"
-                    tabIndex={0}
-                    className={
-                      "relative aspect-square overflow-hidden rounded-lg bg-surface-secondary cursor-pointer " +
-                      (checked ? "outline outline-2 outline-accent" : "")
-                    }
-                    onClick={() => onToggle(image.url, !checked)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        onToggle(image.url, !checked);
-                      }
-                    }}
-                  >
-                    <div
-                      className="absolute left-1 top-1 z-10"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <Checkbox
-                        aria-label={image.alt || image.url}
-                        isSelected={checked}
-                        isDisabled={busy}
-                        onChange={(isSelected) => onToggle(image.url, isSelected)}
-                      >
-                        <Checkbox.Content>
-                          <Checkbox.Control>
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Content>
-                      </Checkbox>
-                    </div>
-                    <PreviewImage
-                      image={image}
-                      className="pointer-events-none h-full w-full object-cover"
-                    />
-                    {image.isOg ? (
-                      <Chip size="sm" variant="primary" className="absolute right-1 top-1">
-                        <Chip.Label>OG</Chip.Label>
-                      </Chip>
-                    ) : null}
-                    <Chip size="sm" variant="secondary" className="absolute bottom-1 right-1">
-                      <Chip.Label>
-                        {(image.type && image.type !== "unknown" ? image.type : "img").toUpperCase()}
-                      </Chip.Label>
-                    </Chip>
-                  </div>
-                );
-              })}
-            </div>
-
-            <ButtonGroup className="w-full">
-              <Button
-                className="flex-1"
-                size="sm"
-                isDisabled={busy}
-                onPress={() => onDownload(filtered)}
-              >
-                {downloadLabel}
-              </Button>
-              <Dropdown>
+                    <TagGroup.List>
+                      <Tag id="all" textValue={t("filterAll")}>
+                        <span>{t("filterAll")}</span>
+                        <span className="text-muted tabular-nums">{pageImages.length}</span>
+                      </Tag>
+                      {types.map((type) => {
+                        const label = t(FILTER_I18N[type]);
+                        return (
+                          <Tag key={type} id={type} textValue={label}>
+                            <span>{label}</span>
+                            <span className="text-muted tabular-nums">{typeCounts[type]}</span>
+                          </Tag>
+                        );
+                      })}
+                    </TagGroup.List>
+                  </TagGroup>
+                ) : (
+                  <div className="flex-1" />
+                )}
                 <Button
                   size="sm"
-                  isDisabled={busy}
-                  aria-label={t("downloadMenu")}
+                  variant="outline"
+                  className="h-6 min-h-6 shrink-0 px-2 text-xs"
+                  isDisabled={busy || filtered.length === 0}
+                  onPress={handleSelectToggle}
                 >
-                  ▾
+                  {hasSelection ? t("unselectAll") : t("selectAll")}
                 </Button>
-                <Dropdown.Popover placement="top end">
-                  <Dropdown.Menu
-                    onAction={(key) => {
-                      if (key === "zip") onDownloadZip(filtered);
-                    }}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {filtered.map((image) => (
+                  <GalleryImageCell
+                    key={image.url}
+                    image={image}
+                    checked={Boolean(selected[image.url])}
+                    busy={busy}
+                    onToggle={onToggle}
+                    onOpenImage={onOpenImage}
+                    onCopyLink={onCopyLink}
+                    onCopySvg={onCopySvg}
+                  />
+                ))}
+              </div>
+
+              <div className="flex w-full items-center gap-2">
+                <Button
+                  fullWidth
+                  size="md"
+                  className="flex-1"
+                  isDisabled={busy}
+                  onPress={() => onDownload(filtered)}
+                >
+                  {downloadLabel}
+                </Button>
+                <Tooltip delay={300}>
+                  <Button
+                    size="md"
+                    variant="secondary"
+                    className="min-w-10 shrink-0 px-2"
+                    isDisabled={busy}
+                    aria-label={t("tooltipZip")}
+                    onPress={() => onDownloadZip(filtered)}
                   >
-                    <Dropdown.Item id="zip" textValue={t("downloadZip")}>
-                      <Label>{t("downloadZip")}</Label>
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown.Popover>
-              </Dropdown>
-            </ButtonGroup>
-          </Accordion.Body>
-        </Accordion.Panel>
-      </Accordion.Item>
-    </Accordion>
+                    <span className="text-xs font-semibold tracking-wide">{t("zipLabel")}</span>
+                  </Button>
+                  <Tooltip.Content>
+                    {t("tooltipZip")}
+                  </Tooltip.Content>
+                </Tooltip>
+              </div>
+            </Disclosure.Body>
+          </Card.Content>
+        </Disclosure.Content>
+      </Disclosure>
+    </Card>
   );
 }

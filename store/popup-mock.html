@@ -1,181 +1,470 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <title>OG Downloader</title>
-    <link rel="stylesheet" href="../popup.css" />
     <style>
-      html,
-      body {
+      :root {
+        --accent: oklch(62.04% 0.195 253.83);
+        --accent-fg: oklch(99.11% 0 0);
+        --bg: oklch(97.02% 0.0015 253.83);
+        --fg: oklch(21.03% 0.0015 253.83);
+        --muted: oklch(55.17% 0.003 253.83);
+        --surface: oklch(100% 0.0008 253.83);
+        --surface-2: oklch(95.24% 0.0012 253.83);
+        --separator: oklch(92% 0.0015 253.83);
+        --border: oklch(90% 0.0015 253.83);
+        --success: oklch(73.29% 0.1941 150.81);
+        --radius: 12px;
+        --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      html[data-theme="dark"] {
+        --bg: oklch(12% 0.0015 253.83);
+        --fg: oklch(99.11% 0.0015 253.83);
+        --muted: oklch(70.5% 0.003 253.83);
+        --surface: oklch(21.03% 0.003 253.83);
+        --surface-2: oklch(25.7% 0.0023 253.83);
+        --separator: oklch(25% 0.0015 253.83);
+        --border: oklch(28% 0.0015 253.83);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
         width: 360px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.45 var(--font);
         overflow: hidden;
       }
-      .locale-fake {
-        position: relative;
-        z-index: 8;
+      .app { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+      .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .brand { font-weight: 600; font-size: 13px; }
+      .host { color: var(--muted); font-size: 12px; word-break: break-all; margin-top: 2px; }
+      .header-actions { display: flex; gap: 4px; flex-shrink: 0; }
+      .icon-btn {
+        width: 28px; height: 28px; border: 0; border-radius: 8px;
+        background: transparent; color: var(--muted); cursor: pointer;
+        display: grid; place-items: center;
       }
-      .locale-trigger {
-        height: 26px;
-        min-width: 118px;
-        padding: 0 8px;
-        border: 1px solid var(--accent);
-        border-radius: 6px;
+      .icon-btn:hover { color: var(--fg); background: var(--surface-2); }
+      .icon-btn svg { width: 16px; height: 16px; }
+
+      .card {
         background: var(--surface);
-        color: var(--text);
-        font: inherit;
-        text-align: left;
-        box-shadow: 0 0 0 3px rgba(232, 163, 23, 0.28);
+        border: 1px solid var(--separator);
+        border-radius: var(--radius);
+        overflow: hidden;
       }
-      .locale-menu {
-        position: absolute;
-        right: 0;
-        top: calc(100% + 4px);
-        min-width: 148px;
-        margin: 0;
-        padding: 4px;
-        list-style: none;
-        background: #1c1c1c;
-        border: 1px solid #2a2a2a;
-        border-radius: 8px;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      .preview {
+        aspect-ratio: 1200 / 630;
+        background: var(--surface-2);
+        display: flex; align-items: center; justify-content: center;
+        position: relative; overflow: hidden;
       }
-      .locale-menu li {
-        padding: 8px 10px;
-        border-radius: 6px;
-        font-size: 13px;
-        color: var(--text);
+      .preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+      .chip {
+        position: absolute; left: 8px; bottom: 8px;
+        max-width: 90%; padding: 2px 8px; border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border: 1px solid var(--border);
+        font-size: 11px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      .locale-menu li.is-active {
-        color: var(--accent);
-        background: #2a2418;
+      .card-meta { padding: 10px 12px 0; }
+      .card-meta h1 { font-size: 13px; font-weight: 600; line-height: 1.35; }
+      .card-meta p { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+      .card-actions { display: flex; gap: 8px; padding: 10px 12px; }
+      .btn {
+        height: 34px; border-radius: 10px; border: 0; font: inherit; font-weight: 550;
+        padding: 0 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       }
-      .locale-menu li.is-hover {
-        background: #2a2a2a;
+      .btn-primary { background: var(--accent); color: var(--accent-fg); flex: 1; }
+      .btn-secondary {
+        width: 34px; padding: 0; background: var(--surface-2); color: var(--fg);
+        border: 1px solid var(--border);
       }
+      .btn-outline {
+        height: 24px; padding: 0 8px; font-size: 12px;
+        background: transparent; border: 1px solid var(--border); color: var(--fg); border-radius: 8px;
+      }
+      .btn-ghost {
+        background: transparent; border: 0; color: var(--fg); font: inherit; cursor: pointer;
+        width: 100%; display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 12px; font-weight: 550; font-size: 13px;
+      }
+      .btn-ghost .count { color: var(--muted); font-weight: 400; }
+
+      .section-label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+      .thumbs { display: flex; gap: 8px; overflow: hidden; }
+      .thumb {
+        width: 56px; height: 56px; border-radius: 10px; overflow: hidden;
+        border: 2px solid transparent; background: var(--surface-2); flex-shrink: 0;
+      }
+      .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .thumb.active { border-color: var(--accent); }
+
+      .gallery-head { border-bottom: 1px solid var(--separator); }
+      .gallery-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--separator); }
+      .filters { display: flex; align-items: center; gap: 8px; }
+      .tags { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+      .tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        height: 24px; padding: 0 8px; border-radius: 999px;
+        background: var(--surface-2); color: var(--fg); font-size: 12px; border: 1px solid transparent;
+      }
+      .tag .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+      .tag.active { background: color-mix(in oklab, var(--accent) 14%, var(--surface)); border-color: color-mix(in oklab, var(--accent) 35%, transparent); color: var(--accent); }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .cell {
+        position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+        background: var(--surface-2); outline: 2px solid transparent;
+      }
+      .cell.checked { outline-color: var(--accent); }
+      .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .check {
+        position: absolute; left: 4px; top: 4px; z-index: 2;
+        width: 16px; height: 16px; border-radius: 4px;
+        border: 1.5px solid color-mix(in oklab, var(--fg) 35%, transparent);
+        background: color-mix(in oklab, var(--surface) 80%, transparent);
+      }
+      .cell.checked .check {
+        background: var(--accent); border-color: var(--accent);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+        background-size: 12px; background-repeat: no-repeat; background-position: center;
+      }
+      .badge-og {
+        position: absolute; right: 4px; top: 4px;
+        background: var(--accent); color: var(--accent-fg);
+        font-size: 10px; font-weight: 650; padding: 1px 6px; border-radius: 999px;
+      }
+      .badge-type {
+        position: absolute; right: 4px; bottom: 4px;
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border: 1px solid var(--border);
+        font-size: 10px; padding: 1px 5px; border-radius: 999px;
+      }
+      .more {
+        position: absolute; right: 2px; top: 2px; z-index: 3;
+        width: 22px; height: 22px; border-radius: 6px; border: 0;
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        color: var(--fg); display: grid; place-items: center;
+      }
+      .cell-menu {
+        position: absolute; right: 4px; top: 26px; z-index: 5;
+        min-width: 110px; padding: 4px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(0,0,0,.18);
+      }
+      .cell-menu div { padding: 7px 10px; border-radius: 7px; font-size: 12px; }
+      .cell-menu div.hot { background: var(--surface-2); }
+
+      .dl-row { display: flex; }
+      .btn-group { display: inline-flex; border-radius: 10px; overflow: hidden; }
+      .btn-group .btn-primary { border-radius: 10px 0 0 10px; flex: 0 0 auto; padding: 0 14px; }
+      .btn-group .caret {
+        width: 34px; border: 0; border-left: 1px solid color-mix(in oklab, white 25%, transparent);
+        background: var(--accent); color: var(--accent-fg); border-radius: 0 10px 10px 0; cursor: pointer;
+        display: grid; place-items: center;
+      }
+      .zip-menu {
+        position: absolute; left: 12px; bottom: 52px; z-index: 6;
+        min-width: 150px; padding: 4px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 12px 28px rgba(0,0,0,.2);
+      }
+      .zip-menu div { padding: 8px 10px; border-radius: 7px; font-size: 13px; }
+      .zip-menu div.hot { background: var(--surface-2); }
+
+      .alert {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px; border-radius: 10px;
+        background: color-mix(in oklab, var(--success) 16%, var(--surface));
+        color: var(--fg); font-size: 12px;
+      }
+      .alert-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;
+      }
+
+      .modal-scrim {
+        position: absolute; inset: 0; background: rgba(0,0,0,.35);
+        display: flex; align-items: flex-start; justify-content: center; padding: 48px 12px 12px; z-index: 20;
+      }
+      .modal-scrim.fill {
+        top: 44px;
+        background: var(--bg);
+        padding: 0 12px 12px;
+        align-items: stretch;
+      }
+      .modal-scrim.fill .modal {
+        box-shadow: none; border: 1px solid var(--separator); height: 100%;
+      }
+      .modal {
+        width: 100%; background: var(--surface); border-radius: 14px; padding: 14px;
+        border: 1px solid var(--border); box-shadow: 0 18px 40px rgba(0,0,0,.25);
+        position: relative;
+      }
+      .modal h2 { font-size: 15px; font-weight: 650; margin-bottom: 14px; }
+      .modal-close {
+        position: absolute; right: 10px; top: 10px; width: 28px; height: 28px;
+        border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1;
+      }
+      .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+      .field label { font-size: 12px; font-weight: 550; }
+      .select {
+        height: 34px; border-radius: 10px; border: 1px solid var(--border);
+        background: var(--surface-2); color: var(--fg); padding: 0 10px;
+        display: flex; align-items: center; justify-content: space-between; font: inherit;
+      }
+      .select.open { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent); }
+      .menu {
+        margin-top: 4px; padding: 4px; border-radius: 10px;
+        background: var(--surface); border: 1px solid var(--border);
+        box-shadow: 0 10px 24px rgba(0,0,0,.16);
+      }
+      .menu li {
+        list-style: none; padding: 8px 10px; border-radius: 7px; font-size: 13px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .menu li.active { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
+      .menu li.hot { background: var(--surface-2); }
+      .check-mark { color: var(--accent); font-size: 12px; }
+
+      .shell { position: relative; min-height: 220px; }
+      .shell.settings-shell { min-height: 400px; }
+      [hidden] { display: none !important; }
     </style>
   </head>
   <body>
-    <div class="app">
-      <header class="header">
-        <div>
-          <div class="brand">OG Downloader</div>
-          <div class="host" id="host">northline.journal</div>
-        </div>
-        <div class="header-actions">
-          <label class="locale-wrap" id="locale-native">
-            <span class="visually-hidden">Language</span>
-            <select id="locale">
-              <option selected>English</option>
-              <option>Français</option>
-              <option>Русский</option>
-              <option>中文</option>
-            </select>
-          </label>
-          <div class="locale-fake" id="locale-fake" hidden>
-            <button class="locale-trigger" type="button">English</button>
-            <ul class="locale-menu">
-              <li class="is-active">English</li>
-              <li>Français</li>
-              <li class="is-hover">Русский</li>
-              <li>中文</li>
-            </ul>
-          </div>
-          <button class="text-btn" type="button">Refresh</button>
-        </div>
-      </header>
-
-      <section id="state-content">
-        <div class="preview" id="preview">
-          <img id="preview-img" alt="OG image preview" />
-          <div class="badge" id="badge"></div>
-        </div>
-
-        <h1 class="page-title" id="title"></h1>
-        <p class="page-desc" id="description"></p>
-
-        <div class="actions">
-          <button class="btn btn-primary" type="button">Download</button>
-          <button class="btn btn-secondary" type="button">Copy URL</button>
-          <button class="btn btn-secondary" type="button">Open</button>
-        </div>
-
-        <div class="thumbs-wrap" id="thumbs-wrap" hidden>
-          <div class="thumbs-label">Other images</div>
-          <div class="thumbs" id="thumbs"></div>
-        </div>
-      </section>
-
-      <p class="status" id="status" hidden></p>
+    <div class="shell">
+      <div class="app" id="app"></div>
+      <div id="overlay"></div>
     </div>
     <script>
-      const params = new URLSearchParams(location.search);
-      const scene = params.get("scene") || "1";
+      const I = {
+        refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`,
+        settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>`,
+        copy: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+        open: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>`,
+        chev: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`,
+        chevUp: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>`,
+        dots: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>`
+      };
 
       const scenes = {
-        "1": {
-          src: "og-ridge.svg",
+        1: {
+          theme: "light",
+          host: "northline.journal",
+          preview: "og-ridge.svg",
           badge: "1200×630 · JPG",
           title: "Ridge Light on the High Road",
-          description:
-            "A late-day traverse above the basin, when the ridgeline holds the last of the sun.",
+          desc: "A late-day traverse above the basin, when the ridgeline holds the last of the sun.",
           thumbs: false,
-          status: ""
+          galleryOpen: false,
+          galleryCount: 12,
+          status: "Saved to Downloads"
         },
-        "2": {
-          src: "og-harbor.svg",
+        2: {
+          theme: "light",
+          host: "northline.journal",
+          preview: "og-harbor.svg",
           badge: "1200×630 · PNG · Twitter",
           title: "Harbor After Dark",
-          description: "Open Graph, Twitter Card, and JSON-LD images from the same article.",
+          desc: "Open Graph, Twitter Card, and JSON-LD images from the same article.",
           thumbs: true,
-          status: "URL copied"
+          galleryOpen: false,
+          galleryCount: 18
         },
-        "3": {
-          src: "og-ridge.svg",
+        3: {
+          theme: "light",
+          host: "northline.journal",
+          preview: "og-harbor.svg",
+          badge: "1200×630 · PNG",
+          title: "Harbor After Dark",
+          desc: "Select page images, filter by format, download one by one or as ZIP.",
+          thumbs: false,
+          galleryOpen: true,
+          galleryCount: 18,
+          zipOpen: true,
+          selected: [0, 1, 3]
+        },
+        4: {
+          theme: "light",
+          host: "northline.journal",
+          preview: "og-ridge.svg",
           badge: "1200×630 · JPG",
           title: "Ridge Light on the High Road",
-          description:
-            "A late-day traverse above the basin, when the ridgeline holds the last of the sun.",
+          desc: "Theme and language live under Settings.",
           thumbs: false,
-          status: "",
-          langs: true
+          galleryOpen: false,
+          galleryCount: 12,
+          settings: true,
+          langOpen: true,
+          settingsOnly: true
+        },
+        5: {
+          theme: "dark",
+          host: "northline.journal",
+          preview: "og-studio.svg",
+          badge: "800×800 · SVG",
+          title: "Studio Mark",
+          desc: "Dark theme, SVG actions, and per-image menus.",
+          thumbs: false,
+          galleryOpen: true,
+          galleryCount: 9,
+          cellMenu: 2,
+          selected: [2]
         }
       };
 
-      const data = scenes[scene] || scenes["1"];
-      document.getElementById("preview-img").src = data.src;
-      document.getElementById("badge").textContent = data.badge;
-      document.getElementById("title").textContent = data.title;
-      document.getElementById("description").textContent = data.description;
+      const galleryImgs = [
+        ["og-ridge.svg", "JPG", true],
+        ["og-harbor.svg", "PNG", false],
+        ["og-studio.svg", "SVG", false],
+        ["og-ridge.svg", "WEBP", false],
+        ["og-harbor.svg", "JPG", false],
+        ["og-studio.svg", "PNG", false]
+      ];
 
-      if (data.thumbs) {
-        const wrap = document.getElementById("thumbs-wrap");
-        const thumbs = document.getElementById("thumbs");
-        wrap.hidden = false;
-        [
-          ["og-ridge.svg", false],
-          ["og-harbor.svg", true],
-          ["og-studio.svg", false]
-        ].forEach(([src, active]) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "thumb" + (active ? " is-active" : "");
-          const img = document.createElement("img");
-          img.alt = "";
-          img.src = src;
-          button.appendChild(img);
-          thumbs.appendChild(button);
-        });
+      const scene = new URLSearchParams(location.search).get("scene") || "1";
+      const data = scenes[scene] || scenes[1];
+      document.documentElement.dataset.theme = data.theme;
+      if (data.settingsOnly) document.querySelector(".shell").classList.add("settings-shell");
+
+      const selected = new Set(data.selected || []);
+      const downloadLabel = selected.size ? `Download (${selected.size})` : "Download all";
+
+      function header() {
+        return `<header class="header">
+          <div><div class="brand">OG Downloader</div><div class="host">${data.host}</div></div>
+          <div class="header-actions">
+            <button class="icon-btn" type="button" aria-label="Refresh">${I.refresh}</button>
+            <button class="icon-btn" type="button" aria-label="Settings">${I.settings}</button>
+          </div>
+        </header>`;
       }
 
-      if (data.status) {
-        const status = document.getElementById("status");
-        status.hidden = false;
-        status.textContent = data.status;
+      function previewCard() {
+        let thumbs = "";
+        if (data.thumbs) {
+          thumbs = `<div>
+            <div class="section-label">Other images</div>
+            <div class="thumbs">
+              <div class="thumb"><img src="og-ridge.svg" alt=""></div>
+              <div class="thumb active"><img src="og-harbor.svg" alt=""></div>
+              <div class="thumb"><img src="og-studio.svg" alt=""></div>
+            </div>
+          </div>`;
+        }
+        return `<section style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <div class="preview">
+              <img src="${data.preview}" alt="">
+              <div class="chip">${data.badge}</div>
+            </div>
+            <div class="card-meta">
+              <h1>${data.title}</h1>
+              <p>${data.desc}</p>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary" type="button">Download</button>
+              <button class="btn btn-secondary" type="button" aria-label="Copy URL">${I.copy}</button>
+              <button class="btn btn-secondary" type="button" aria-label="Open">${I.open}</button>
+            </div>
+          </div>
+          ${thumbs}
+        </section>`;
       }
 
-      if (data.langs) {
-        document.getElementById("locale-native").hidden = true;
-        document.getElementById("locale-fake").hidden = false;
+      function gallery() {
+        const open = data.galleryOpen;
+        let body = "";
+        if (open) {
+          const cells = galleryImgs.map(([src, type, isOg], i) => {
+            const checked = selected.has(i);
+            const menu = data.cellMenu === i
+              ? `<div class="cell-menu"><div>Open</div><div class="hot">Copy link</div>${
+                  type === "SVG" ? "<div>Copy SVG</div>" : ""
+                }</div>`
+              : "";
+            const more = data.cellMenu === i
+              ? `<button class="more" type="button">${I.dots}</button>`
+              : "";
+            return `<div class="cell ${checked ? "checked" : ""}">
+              <div class="check"></div>
+              ${more}
+              ${menu}
+              <img src="${src}" alt="">
+              ${isOg && data.cellMenu !== i ? `<span class="badge-og">OG</span>` : ""}
+              <span class="badge-type">${type}</span>
+            </div>`;
+          }).join("");
+
+          body = `<div class="gallery-body" style="position:relative">
+            <div class="filters">
+              <div class="tags">
+                <span class="tag active"><span>All</span><span class="n">${data.galleryCount}</span></span>
+                <span class="tag"><span>JPEG</span><span class="n">7</span></span>
+                <span class="tag"><span>PNG</span><span class="n">5</span></span>
+                <span class="tag"><span>SVG</span><span class="n">3</span></span>
+                <span class="tag"><span>WebP</span><span class="n">3</span></span>
+              </div>
+              <button class="btn-outline" type="button">${selected.size ? "Unselect all" : "Select all"}</button>
+            </div>
+            <div class="grid">${cells}</div>
+            <div class="dl-row">
+              <div class="btn-group">
+                <button class="btn btn-primary" type="button">${downloadLabel}</button>
+                <button class="caret" type="button" aria-label="More download options">${I.chev}</button>
+              </div>
+            </div>
+            ${data.zipOpen ? `<div class="zip-menu"><div class="hot">Download ZIP</div></div>` : ""}
+          </div>`;
+        }
+        return `<div class="card">
+          <div class="gallery-head">
+            <button class="btn-ghost" type="button">
+              <span>All images <span class="count">(${data.galleryCount})</span></span>
+              ${open ? I.chevUp : I.chev}
+            </button>
+          </div>
+          ${body}
+        </div>`;
+      }
+
+      function status() {
+        if (!data.status) return "";
+        return `<div class="alert"><span class="alert-dot"></span>${data.status}</div>`;
+      }
+
+      document.getElementById("app").innerHTML = data.settingsOnly
+        ? header()
+        : header() + previewCard() + gallery() + status();
+
+      if (data.settings) {
+        document.getElementById("overlay").innerHTML = `
+          <div class="modal-scrim${data.settingsOnly ? " fill" : ""}">
+            <div class="modal">
+              <button class="modal-close" type="button" aria-label="Close">×</button>
+              <h2>Settings</h2>
+              <div class="field">
+                <label>Language</label>
+                <div class="select open"><span>English</span><span>${I.chev}</span></div>
+                ${data.langOpen ? `<ul class="menu">
+                  <li class="active">English <span class="check-mark">✓</span></li>
+                  <li>Français</li>
+                  <li class="hot">Русский</li>
+                  <li>中文</li>
+                </ul>` : ""}
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Theme</label>
+                <div class="select"><span>System</span><span>${I.chev}</span></div>
+                ${data.themeOpen ? `<ul class="menu">
+                  <li>Light</li>
+                  <li>Dark</li>
+                  <li class="active">System <span class="check-mark">✓</span></li>
+                </ul>` : ""}
+              </div>
+            </div>
+          </div>`;
       }
     </script>
   </body>

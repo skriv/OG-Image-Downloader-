@@ -1,5 +1,14 @@
 import { useEffect } from "react";
-import { Button, Label, ListBox, Modal, Select, useTheme } from "@heroui/react";
+import {
+  Button,
+  FieldGroup,
+  Fieldset,
+  Label,
+  ListBox,
+  Modal,
+  Select,
+  useTheme
+} from "@heroui/react";
 import { useI18n } from "./i18n.jsx";
 import { SettingsIcon } from "./icons.jsx";
 
@@ -26,70 +35,74 @@ export function SettingsButton() {
         <SettingsIcon className="size-4" />
       </Button>
       <Modal.Backdrop>
-        <Modal.Container>
-          <Modal.Dialog className="max-w-[300px]">
-            <Modal.CloseTrigger />
+        <Modal.Container className="p-3">
+          <Modal.Dialog className="w-full gap-3 rounded-xl p-3">
+            <Modal.CloseTrigger className="end-3 top-3" />
             <Modal.Header>
               <Modal.Heading>{t("settings")}</Modal.Heading>
             </Modal.Header>
-            <Modal.Body className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label>{t("language")}</Label>
-                <Select
-                  aria-label={t("language")}
-                  selectedKey={locale}
-                  onSelectionChange={(key) => {
-                    if (key) setLocale(String(key));
-                  }}
-                >
-                  <Select.Trigger>
-                    <Select.Value />
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox>
-                      {locales.map((item) => (
-                        <ListBox.Item key={item.code} id={item.code} textValue={item.name}>
-                          {item.name}
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                      ))}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
-              </div>
+            <Modal.Body>
+              <Fieldset>
+                <FieldGroup className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>{t("language")}</Label>
+                    <Select
+                      aria-label={t("language")}
+                      selectedKey={locale}
+                      onSelectionChange={(key) => {
+                        if (key) setLocale(String(key));
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox>
+                          {locales.map((item) => (
+                            <ListBox.Item key={item.code} id={item.code} textValue={item.name}>
+                              {item.name}
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                          ))}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  </div>
 
-              <div className="flex flex-col gap-2">
-                <Label>{t("theme")}</Label>
-                <Select
-                  aria-label={t("theme")}
-                  selectedKey={theme}
-                  onSelectionChange={(key) => {
-                    if (key) chooseTheme(String(key));
-                  }}
-                >
-                  <Select.Trigger>
-                    <Select.Value />
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox>
-                      <ListBox.Item id="light" textValue={t("themeLight")}>
-                        {t("themeLight")}
-                        <ListBox.ItemIndicator />
-                      </ListBox.Item>
-                      <ListBox.Item id="dark" textValue={t("themeDark")}>
-                        {t("themeDark")}
-                        <ListBox.ItemIndicator />
-                      </ListBox.Item>
-                      <ListBox.Item id="system" textValue={t("themeSystem")}>
-                        {t("themeSystem")}
-                        <ListBox.ItemIndicator />
-                      </ListBox.Item>
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
-              </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>{t("theme")}</Label>
+                    <Select
+                      aria-label={t("theme")}
+                      selectedKey={theme}
+                      onSelectionChange={(key) => {
+                        if (key) chooseTheme(String(key));
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox>
+                          <ListBox.Item id="light" textValue={t("themeLight")}>
+                            {t("themeLight")}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                          <ListBox.Item id="dark" textValue={t("themeDark")}>
+                            {t("themeDark")}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                          <ListBox.Item id="system" textValue={t("themeSystem")}>
+                            {t("themeSystem")}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  </div>
+                </FieldGroup>
+              </Fieldset>
             </Modal.Body>
           </Modal.Dialog>
         </Modal.Container>

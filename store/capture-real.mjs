@@ -180,27 +180,37 @@ async function prepareScene(popup, scene) {
     if (await allImages.count()) {
       await allImages.click();
       await popup.waitForTimeout(800);
+
+      // Prefer a compact filter so header + grid + download fit in one frame
+      const compact = popup.locator("span, button, div").filter({ hasText: /^(PNG|GIF|AVIF)\s*\d+$/i });
+      if (await compact.count()) {
+        await compact.first().click().catch(() => {});
+        await popup.waitForTimeout(400);
+      }
+
       const cells = popup.locator('[class*="aspect-square"]');
       const count = await cells.count();
       for (let i = 0; i < Math.min(count, 3); i++) {
         await cells.nth(i).click({ force: true }).catch(() => {});
         await popup.waitForTimeout(120);
       }
-      // Open Download ZIP menu via caret in the button group
+
+      // Open per-image menu on first cell if SVG filter active (shows Copy SVG)
+      const more = cells.first().locator("button").first();
+      if (await more.count()) {
+        await cells.first().hover().catch(() => {});
+        await more.click({ force: true }).catch(() => {});
+        await popup.waitForTimeout(300);
+      }
+
       const zipTrigger = popup.getByLabel(/More download options/i);
       if (await zipTrigger.count()) {
         await zipTrigger.click();
-      } else {
-        await popup
-          .locator("button")
-          .filter({ hasText: /^$/ })
-          .last()
-          .click({ force: true })
-          .catch(() => {});
+        await popup.waitForTimeout(400);
+        await popup.getByText(/Download ZIP/i).waitFor({ timeout: 3000 }).catch(() => {});
       }
-      await popup.waitForTimeout(500);
-      // Ensure ZIP item is visible
-      await popup.getByText(/Download ZIP/i).waitFor({ timeout: 3000 }).catch(() => {});
+
+      await popup.evaluate(() => window.scrollTo(0, 0));
     }
   }
 
@@ -317,16 +327,73 @@ async function main() {
         }
         await popup.waitForTimeout(500);
 
-        const contentH = await popup.evaluate(() => {
-          const root = document.getElementById("root") || document.body;
-          return Math.ceil(
-            Math.max(root.scrollHeight, document.documentElement.scrollHeight, 240)
-          );
-        });
-        await popup.setViewportSize({
-          width: 360,
-          height: Math.min(Math.max(contentH + 4, 240), 980)
-        });
+        if (cfg.scene === "gallery") {
+          await popup.evaluate(() => window.scrollTo(0, 0));
+          let bottom = await popup.evaluate(() => {
+            const downloadBtns = [...document.querySelectorAll("button")].filter((b) =>
+              /Download/i.test(b.textContent || "")
+            );
+            const dl = downloadBtns[downloadBtns.length - 1];
+            return dl ? dl.getBoundingClientRect().bottom + 24 : 820;
+          });
+          if (bottom > 860) {
+            await popup.evaluate(() => {
+              document.querySelectorAll(".og-preview-frame").forEach((el) => {
+                el.style.maxHeight = "72px";
+                el.style.overflow = "hidden";
+              });
+              document.querySelectorAll("h1, [class*='Card.Title'], .line-clamp-2").forEach((el) => {
+                if ((el.textContent || "").length > 40) el.style.display = "none";
+              });
+            });
+            await popup.waitForTimeout(100);
+            bottom = await popup.evaluate(() => {
+              const downloadBtns = [...document.querySelectorAll("button")].filter((b) =>
+                /Download/i.test(b.textContent || "")
+              );
+              const dl = downloadBtns[downloadBtns.length - 1];
+              return dl ? dl.getBoundingClientRect().bottom + 24 : 820;
+            });
+          }
+          await popup.setViewportSize({
+            width: 360,
+            height: Math.ceil(Math.min(Math.max(bottom, 560), 860))
+          });
+          await popup.waitForTimeout(200);
+          await popup.evaluate(() => window.scrollTo(0, 0));
+          const popupShot = join(OUT, `${site.id}-${cfg.scene}-popup.png`);
+          await popup.screenshot({ path: popupShot, type: "png", animations: "disabled" });
+          compose(pageShot, popupShot, join(STORE, cfg.out), { center: false });
+          outputs.push(cfg.out);
+          await popup.close();
+          continue;
+        }
+
+        if (cfg.scene === "settings") {
+          await popup.evaluate(() => window.scrollTo(0, 0));
+          const contentH = await popup.evaluate(() => {
+            const root = document.getElementById("root") || document.body;
+            return Math.ceil(
+              Math.max(root.scrollHeight, document.documentElement.scrollHeight, 240)
+            );
+          });
+          await popup.setViewportSize({
+            width: 360,
+            height: Math.min(Math.max(contentH + 4, 420), 800)
+          });
+        } else {
+          await popup.evaluate(() => window.scrollTo(0, 0));
+          const contentH = await popup.evaluate(() => {
+            const root = document.getElementById("root") || document.body;
+            return Math.ceil(
+              Math.max(root.scrollHeight, document.documentElement.scrollHeight, 240)
+            );
+          });
+          await popup.setViewportSize({
+            width: 360,
+            height: Math.min(Math.max(contentH + 4, 240), 820)
+          });
+        }
         await popup.waitForTimeout(250);
 
         const popupShot = join(OUT, `${site.id}-${cfg.scene}-popup.png`);

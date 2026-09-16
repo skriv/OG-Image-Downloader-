@@ -2,13 +2,14 @@
   "manifest_version": 3,
   "name": "OG Downloader",
   "version": "1.0.0",
-  "description": "Скачивайте Open Graph-картинки с текущей страницы.",
+  "description": "Download Open Graph images from the current page.",
   "permissions": [
     "activeTab",
     "scripting",
     "downloads",
     "contextMenus",
-    "clipboardWrite"
+    "clipboardWrite",
+    "storage"
   ],
   "host_permissions": [
     "http://*/*",
@@ -33,7 +34,7 @@
         "default": "Alt+Shift+O",
         "mac": "Alt+Shift+O"
       },
-      "description": "Открыть OG Downloader"
+      "description": "Open OG Downloader"
     }
   },
   "icons": {

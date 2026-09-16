@@ -1,6 +1,6 @@
 "use strict";
 
-importScripts("extract.js");
+importScripts("locales.js", "i18n.js", "extract.js");
 
 var MENU_ID = "download-og-image";
 
@@ -8,14 +8,25 @@ function createMenu() {
   chrome.contextMenus.removeAll(function () {
     chrome.contextMenus.create({
       id: MENU_ID,
-      title: "Скачать OG-картинку",
+      title: t("contextMenuDownload"),
       contexts: ["page", "action"]
     });
   });
 }
 
-chrome.runtime.onInstalled.addListener(createMenu);
-chrome.runtime.onStartup.addListener(createMenu);
+function loadLocaleAndMenu() {
+  loadLocale().then(createMenu);
+}
+
+chrome.runtime.onInstalled.addListener(loadLocaleAndMenu);
+chrome.runtime.onStartup.addListener(loadLocaleAndMenu);
+loadLocaleAndMenu();
+
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area !== "local" || !changes.locale) return;
+  currentLocale = resolveLocale(changes.locale.newValue);
+  createMenu();
+});
 
 function blobToDataUrl(blob) {
   return new Promise(function (resolve, reject) {
@@ -24,7 +35,7 @@ function blobToDataUrl(blob) {
       resolve(reader.result);
     };
     reader.onerror = function () {
-      reject(reader.error || new Error("Не удалось прочитать файл"));
+      reject(reader.error || new Error(t("readFileFailed")));
     };
     reader.readAsDataURL(blob);
   });
@@ -76,7 +87,7 @@ async function downloadWithFallback(url, filename) {
     return { ok: true, id: id };
   } catch (err) {
     if (url.indexOf("data:") === 0) {
-      return { ok: false, error: err.message || "Не удалось скачать" };
+      return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
     }
   }
 
@@ -87,7 +98,12 @@ async function downloadWithFallback(url, filename) {
       signal: get.signal
     });
     if (!response.ok) {
-      return { ok: false, error: "Сервер вернул " + response.status };
+      return {
+        ok: false,
+        errorKey: "serverStatus",
+        errorVars: { status: response.status },
+        error: t("serverStatus", { status: response.status })
+      };
     }
     var blob = await response.blob();
     var dataUrl = await blobToDataUrl(blob);
@@ -99,7 +115,7 @@ async function downloadWithFallback(url, filename) {
     });
     return { ok: true, id: id };
   } catch (err) {
-    return { ok: false, error: err.message || "Не удалось скачать" };
+    return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
   } finally {
     get.cancel();
   }
@@ -124,21 +140,21 @@ function flashBadge(text) {
 async function downloadFromTab(tab) {
   if (!tab || !tab.id || !tab.url || isRestrictedUrl(tab.url)) {
     flashBadge("!");
-    return { ok: false, error: "На этой странице расширение недоступно" };
+    return { ok: false, errorKey: "pageRestricted", error: t("pageRestricted") };
   }
   try {
     var data = await extractFromTab(tab.id);
     var image = data && data.images && data.images[0];
     if (!image) {
       flashBadge("!");
-      return { ok: false, error: "На этой странице нет OG-картинки" };
+      return { ok: false, errorKey: "noOgImage", error: t("noOgImage") };
     }
     var result = await downloadWithFallback(image.url, buildFilename(data, image));
     flashBadge(result.ok ? "OK" : "!");
     return result;
   } catch (err) {
     flashBadge("!");
-    return { ok: false, error: err.message || "Не удалось скачать" };
+    return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
   }
 }
 

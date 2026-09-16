@@ -5,11 +5,17 @@ var state = {
   data: null,
   index: 0,
   probe: null,
-  natural: null
+  natural: null,
+  statusKey: null,
+  statusError: false,
+  statusVars: null,
+  errorKey: null,
+  errorMessage: null
 };
 
 var els = {
   host: document.getElementById("host"),
+  locale: document.getElementById("locale"),
   refresh: document.getElementById("refresh"),
   loading: document.getElementById("state-loading"),
   restricted: document.getElementById("state-restricted"),
@@ -43,16 +49,45 @@ function showOnly(id) {
   els.content.hidden = id !== "content";
 }
 
-function setStatus(message, isError) {
-  if (!message) {
+function setStatus(key, isError, vars) {
+  state.statusKey = key || null;
+  state.statusError = Boolean(isError);
+  state.statusVars = vars || null;
+  if (!key) {
     els.status.hidden = true;
     els.status.textContent = "";
     els.status.classList.remove("is-error");
     return;
   }
   els.status.hidden = false;
-  els.status.textContent = message;
+  els.status.textContent = t(key, vars);
   els.status.classList.toggle("is-error", Boolean(isError));
+}
+
+function fillLocaleSelect() {
+  els.locale.innerHTML = "";
+  getLocales().forEach(function (locale) {
+    var option = document.createElement("option");
+    option.value = locale.code;
+    option.textContent = locale.name;
+    if (locale.code === currentLocale) option.selected = true;
+    els.locale.appendChild(option);
+  });
+}
+
+function applyLanguage() {
+  applyDomTranslations();
+  fillLocaleSelect();
+  if (state.statusKey) setStatus(state.statusKey, state.statusError, state.statusVars);
+  if (!els.error.hidden) {
+    els.errorText.textContent = state.errorKey
+      ? t(state.errorKey)
+      : state.errorMessage || t("errorFallback");
+  }
+  var image = currentImage();
+  if (image) {
+    els.previewImg.alt = image.alt || (state.data && state.data.title) || t("previewAlt");
+  }
 }
 
 function currentImage() {
@@ -113,7 +148,7 @@ function selectImage(index) {
   els.preview.classList.remove("is-broken");
   els.previewError.hidden = true;
   els.previewUrl.textContent = image.url;
-  els.previewImg.alt = image.alt || state.data.title || "OG image";
+  els.previewImg.alt = image.alt || state.data.title || t("previewAlt");
   els.previewImg.src = image.url;
   renderBadge();
   renderThumbs();
@@ -165,9 +200,11 @@ function probeSelected() {
   });
 }
 
-function showError(message) {
+function showError(message, key) {
   showOnly("error");
-  els.errorText.textContent = message || "Попробуйте обновить страницу и открыть расширение снова.";
+  state.errorKey = key || null;
+  state.errorMessage = message || null;
+  els.errorText.textContent = key ? t(key) : message || t("errorFallback");
 }
 
 async function loadPage() {
@@ -219,7 +256,7 @@ async function loadPage() {
 
   var data = results && results[0] && results[0].result;
   if (!data) {
-    showError("Страница не вернула мета-теги.");
+    showError(null, "errorNoMeta");
     return;
   }
 
@@ -242,7 +279,7 @@ async function downloadSelected() {
   var image = currentImage();
   if (!image || !state.data) return;
   setBusy(true);
-  setStatus("Скачиваю…");
+  setStatus("downloading");
   chrome.runtime.sendMessage(
     {
       type: "download",
@@ -253,14 +290,24 @@ async function downloadSelected() {
     function (result) {
       setBusy(false);
       if (chrome.runtime.lastError) {
-        setStatus(chrome.runtime.lastError.message, true);
+        els.status.hidden = false;
+        els.status.textContent = chrome.runtime.lastError.message;
+        els.status.classList.add("is-error");
+        state.statusKey = null;
         return;
       }
       if (!result || !result.ok) {
-        setStatus((result && result.error) || "Не удалось скачать", true);
+        if (result && result.errorKey) {
+          setStatus(result.errorKey, true, result.errorVars);
+        } else {
+          setStatus("downloadFailed", true);
+          if (result && result.error) {
+            els.status.textContent = result.error;
+          }
+        }
         return;
       }
-      setStatus("Сохранено в Загрузки");
+      setStatus("savedToDownloads");
     }
   );
 }
@@ -270,9 +317,9 @@ async function copySelected() {
   if (!image) return;
   try {
     await navigator.clipboard.writeText(image.url);
-    setStatus("URL скопирован");
+    setStatus("urlCopied");
   } catch (err) {
-    setStatus("Не удалось скопировать URL", true);
+    setStatus("copyFailed", true);
   }
 }
 
@@ -316,6 +363,10 @@ els.open.addEventListener("click", openSelected);
 els.refresh.addEventListener("click", loadPage);
 els.errorRetry.addEventListener("click", loadPage);
 
+els.locale.addEventListener("change", function () {
+  setLocale(els.locale.value).then(applyLanguage);
+});
+
 document.addEventListener("keydown", function (event) {
   if (event.key === "Enter" && !els.content.hidden) {
     event.preventDefault();
@@ -323,4 +374,7 @@ document.addEventListener("keydown", function (event) {
   }
 });
 
-loadPage();
+loadLocale().then(function () {
+  applyLanguage();
+  loadPage();
+});

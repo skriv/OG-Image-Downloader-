@@ -10,6 +10,7 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "icons")
+PUBLIC_OUT = os.path.join(ROOT, "public", "icons")
 
 BG = (18, 18, 18, 255)
 FRAME = (44, 44, 44, 255)
@@ -143,10 +144,17 @@ def downsample(src, src_size, dst_size):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    os.makedirs(PUBLIC_OUT, exist_ok=True)
     master = draw_icon(128)
-    write_png(os.path.join(OUT, "icon128.png"), 128, 128, master)
-    for size in (16, 32, 48):
-        write_png(os.path.join(OUT, f"icon{size}.png"), size, size, downsample(master, 128, size))
+    for folder in (OUT, PUBLIC_OUT):
+        write_png(os.path.join(folder, "icon128.png"), 128, 128, master)
+        for size in (16, 32, 48):
+            write_png(
+                os.path.join(folder, f"icon{size}.png"),
+                size,
+                size,
+                downsample(master, 128, size),
+            )
 
 
 if __name__ == "__main__":

@@ -4,89 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OG Downloader</title>
-    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="app">
-      <header class="header">
-        <div>
-          <div class="brand">OG Downloader</div>
-          <div class="host" id="host">—</div>
-        </div>
-        <div class="header-actions">
-          <label class="locale-wrap">
-            <span class="visually-hidden" data-i18n="language">Language</span>
-            <select id="locale"></select>
-          </label>
-          <button class="text-btn" id="refresh" type="button" data-i18n="refresh">Refresh</button>
-        </div>
-      </header>
-
-      <section class="panel" id="state-loading" hidden>
-        <p class="muted" data-i18n="loading">Reading page meta tags…</p>
-      </section>
-
-      <section class="panel" id="state-restricted" hidden>
-        <p class="title" data-i18n="restrictedTitle">Not available on this page</p>
-        <p class="muted" data-i18n="restrictedBody">
-          Open a regular HTTP or HTTPS site and try the icon again.
-        </p>
-      </section>
-
-      <section class="panel" id="state-error" hidden>
-        <p class="title" id="error-title" data-i18n="errorTitle">Couldn’t read this page</p>
-        <p class="muted" id="error-text"></p>
-        <button class="btn btn-secondary" id="error-retry" type="button" data-i18n="errorRetry">
-          Try again
-        </button>
-      </section>
-
-      <section class="panel" id="state-empty" hidden>
-        <p class="title" data-i18n="emptyTitle">No OG image on this page</p>
-        <p class="muted" data-i18n-html="emptyBody">
-          No <code>og:image</code>, Twitter Card, or fallback tags. If this is an SPA, wait for it
-          to load and press Refresh.
-        </p>
-      </section>
-
-      <section id="state-content" hidden>
-        <div class="preview" id="preview">
-          <img id="preview-img" alt="OG image preview" referrerpolicy="no-referrer" />
-          <div class="preview-error" id="preview-error" hidden>
-            <p data-i18n="previewFailed">Image failed to load</p>
-            <button class="text-btn" id="preview-retry" type="button" data-i18n="previewRetry">
-              Retry
-            </button>
-            <p class="url-raw" id="preview-url"></p>
-          </div>
-          <div class="badge" id="badge"></div>
-        </div>
-
-        <h1 class="page-title" id="title"></h1>
-        <p class="page-desc" id="description"></p>
-
-        <div class="actions">
-          <button class="btn btn-primary" id="download" type="button" data-i18n="download">
-            Download
-          </button>
-          <button class="btn btn-secondary" id="copy" type="button" data-i18n="copyUrl">
-            Copy URL
-          </button>
-          <button class="btn btn-secondary" id="open" type="button" data-i18n="open">Open</button>
-        </div>
-
-        <div class="thumbs-wrap" id="thumbs-wrap" hidden>
-          <div class="thumbs-label" data-i18n="otherImages">Other images</div>
-          <div class="thumbs" id="thumbs"></div>
-        </div>
-      </section>
-
-      <p class="status" id="status" hidden></p>
-    </div>
-
-    <script src="locales.js"></script>
-    <script src="i18n.js"></script>
-    <script src="extract.js"></script>
-    <script src="popup.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/popup/main.jsx"></script>
   </body>
 </html>

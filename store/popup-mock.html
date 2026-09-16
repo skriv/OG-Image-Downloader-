@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OG Downloader</title>
+    <link rel="stylesheet" href="../popup.css" />
+    <style>
+      html,
+      body {
+        width: 360px;
+        overflow: hidden;
+      }
+      .locale-fake {
+        position: relative;
+        z-index: 8;
+      }
+      .locale-trigger {
+        height: 26px;
+        min-width: 118px;
+        padding: 0 8px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        text-align: left;
+        box-shadow: 0 0 0 3px rgba(232, 163, 23, 0.28);
+      }
+      .locale-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        min-width: 148px;
+        margin: 0;
+        padding: 4px;
+        list-style: none;
+        background: #1c1c1c;
+        border: 1px solid #2a2a2a;
+        border-radius: 8px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      }
+      .locale-menu li {
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--text);
+      }
+      .locale-menu li.is-active {
+        color: var(--accent);
+        background: #2a2418;
+      }
+      .locale-menu li.is-hover {
+        background: #2a2a2a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div>
+          <div class="brand">OG Downloader</div>
+          <div class="host" id="host">northline.journal</div>
+        </div>
+        <div class="header-actions">
+          <label class="locale-wrap" id="locale-native">
+            <span class="visually-hidden">Language</span>
+            <select id="locale">
+              <option selected>English</option>
+              <option>Français</option>
+              <option>Русский</option>
+              <option>中文</option>
+            </select>
+          </label>
+          <div class="locale-fake" id="locale-fake" hidden>
+            <button class="locale-trigger" type="button">English</button>
+            <ul class="locale-menu">
+              <li class="is-active">English</li>
+              <li>Français</li>
+              <li class="is-hover">Русский</li>
+              <li>中文</li>
+            </ul>
+          </div>
+          <button class="text-btn" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section id="state-content">
+        <div class="preview" id="preview">
+          <img id="preview-img" alt="OG image preview" />
+          <div class="badge" id="badge"></div>
+        </div>
+
+        <h1 class="page-title" id="title"></h1>
+        <p class="page-desc" id="description"></p>
+
+        <div class="actions">
+          <button class="btn btn-primary" type="button">Download</button>
+          <button class="btn btn-secondary" type="button">Copy URL</button>
+          <button class="btn btn-secondary" type="button">Open</button>
+        </div>
+
+        <div class="thumbs-wrap" id="thumbs-wrap" hidden>
+          <div class="thumbs-label">Other images</div>
+          <div class="thumbs" id="thumbs"></div>
+        </div>
+      </section>
+
+      <p class="status" id="status" hidden></p>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const scene = params.get("scene") || "1";
+
+      const scenes = {
+        "1": {
+          src: "og-ridge.svg",
+          badge: "1200×630 · JPG",
+          title: "Ridge Light on the High Road",
+          description:
+            "A late-day traverse above the basin, when the ridgeline holds the last of the sun.",
+          thumbs: false,
+          status: ""
+        },
+        "2": {
+          src: "og-harbor.svg",
+          badge: "1200×630 · PNG · Twitter",
+          title: "Harbor After Dark",
+          description: "Open Graph, Twitter Card, and JSON-LD images from the same article.",
+          thumbs: true,
+          status: "URL copied"
+        },
+        "3": {
+          src: "og-ridge.svg",
+          badge: "1200×630 · JPG",
+          title: "Ridge Light on the High Road",
+          description:
+            "A late-day traverse above the basin, when the ridgeline holds the last of the sun.",
+          thumbs: false,
+          status: "",
+          langs: true
+        }
+      };
+
+      const data = scenes[scene] || scenes["1"];
+      document.getElementById("preview-img").src = data.src;
+      document.getElementById("badge").textContent = data.badge;
+      document.getElementById("title").textContent = data.title;
+      document.getElementById("description").textContent = data.description;
+
+      if (data.thumbs) {
+        const wrap = document.getElementById("thumbs-wrap");
+        const thumbs = document.getElementById("thumbs");
+        wrap.hidden = false;
+        [
+          ["og-ridge.svg", false],
+          ["og-harbor.svg", true],
+          ["og-studio.svg", false]
+        ].forEach(([src, active]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "thumb" + (active ? " is-active" : "");
+          const img = document.createElement("img");
+          img.alt = "";
+          img.src = src;
+          button.appendChild(img);
+          thumbs.appendChild(button);
+        });
+      }
+
+      if (data.status) {
+        const status = document.getElementById("status");
+        status.hidden = false;
+        status.textContent = data.status;
+      }
+
+      if (data.langs) {
+        document.getElementById("locale-native").hidden = true;
+        document.getElementById("locale-fake").hidden = false;
+      }
+    </script>
+  </body>
+</html>

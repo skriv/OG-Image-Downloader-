@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OG Downloader store screenshot</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1280px;
+        height: 800px;
+        overflow: hidden;
+        background: #d8d8d8;
+        font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #1b1b1b;
+      }
+      .window {
+        width: 1280px;
+        height: 800px;
+        display: flex;
+        flex-direction: column;
+        background: #ececec;
+      }
+      .titlebar {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 14px;
+        background: linear-gradient(#f3f3f3, #e7e7e7);
+        border-bottom: 1px solid #cfcfcf;
+        flex-shrink: 0;
+      }
+      .traffic {
+        display: flex;
+        gap: 7px;
+      }
+      .traffic i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: block;
+      }
+      .r {
+        background: #ff5f57;
+      }
+      .y {
+        background: #febc2e;
+      }
+      .g {
+        background: #28c840;
+      }
+      .tabs {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        padding-top: 8px;
+      }
+      .tab {
+        height: 28px;
+        max-width: 240px;
+        padding: 0 14px;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #5c5c5c;
+        background: #dedede;
+      }
+      .tab.active {
+        background: #fff;
+        color: #222;
+        box-shadow: 0 -1px 0 #fff;
+      }
+      .tab-icon {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        background: #e8a317;
+        flex-shrink: 0;
+      }
+      .tab span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .toolbar {
+        height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        background: #fff;
+        border-bottom: 1px solid #e4e4e4;
+        flex-shrink: 0;
+      }
+      .nav {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 0;
+        background: transparent;
+        color: #444;
+        font-size: 16px;
+      }
+      .omnibox {
+        flex: 1;
+        height: 32px;
+        border-radius: 16px;
+        background: #f1f3f4;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        color: #3c4043;
+      }
+      .lock {
+        width: 12px;
+        height: 12px;
+        border: 1.5px solid #5f6368;
+        border-radius: 3px 3px 2px 2px;
+        position: relative;
+      }
+      .lock::before {
+        content: "";
+        position: absolute;
+        left: 2px;
+        top: -6px;
+        width: 5px;
+        height: 6px;
+        border: 1.5px solid #5f6368;
+        border-bottom: 0;
+        border-radius: 6px 6px 0 0;
+      }
+      .toolbar-icons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ext-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        background: #fff7e8;
+        outline: 2px solid #e8a317;
+        outline-offset: 0;
+      }
+      .ext-btn img {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+      .avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #3d5a80;
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .page {
+        flex: 1;
+        position: relative;
+        background: #f6f3ee;
+        overflow: hidden;
+      }
+      .article {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 28px 28px 0;
+      }
+      .kicker {
+        color: #8a6a20;
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .article h1 {
+        margin: 8px 0 12px;
+        font-size: 36px;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+      }
+      .meta {
+        color: #6b6b6b;
+        margin-bottom: 18px;
+      }
+      .hero {
+        width: 100%;
+        height: 320px;
+        object-fit: cover;
+        border-radius: 10px;
+        display: block;
+        background: #1a1a1a;
+      }
+      .lede {
+        margin-top: 16px;
+        font-size: 16px;
+        color: #333;
+        max-width: 62ch;
+      }
+      .popup-wrap {
+        position: absolute;
+        top: 8px;
+        right: 18px;
+        width: 360px;
+        height: 470px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(0, 0, 0, 0.08);
+        background: #121212;
+      }
+      .popup-wrap.scene-2 {
+        height: 528px;
+      }
+      .popup-wrap iframe {
+        width: 360px;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      body[data-scene="2"] .hero {
+        object-position: center 70%;
+      }
+      body[data-scene="3"] .page {
+        background: #1a1814;
+      }
+      body[data-scene="3"] .article {
+        filter: blur(8px);
+        opacity: 0.28;
+        transform: scale(1.08);
+        transform-origin: top center;
+      }
+      body[data-scene="3"] .popup-wrap {
+        top: 50%;
+        left: 50%;
+        right: auto;
+        width: 360px;
+        height: 470px;
+        transform: translate(-50%, -50%) scale(1.55);
+        transform-origin: center center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <div class="titlebar">
+        <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="tabs">
+          <div class="tab"><i class="tab-icon" style="background:#5b8def"></i><span>Inbox</span></div>
+          <div class="tab active"><i class="tab-icon"></i><span id="tab-title">Ridge Light on the High Road</span></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="nav" type="button" aria-hidden="true">←</button>
+        <button class="nav" type="button" aria-hidden="true">→</button>
+        <button class="nav" type="button" aria-hidden="true">↻</button>
+        <div class="omnibox">
+          <span class="lock"></span>
+          <span id="url">northline.journal/stories/ridge-light</span>
+        </div>
+        <div class="toolbar-icons">
+          <div class="ext-btn" title="OG Downloader">
+            <img src="../icons/icon32.png" alt="" />
+          </div>
+          <div class="avatar">A</div>
+        </div>
+      </div>
+      <div class="page">
+        <article class="article">
+          <div class="kicker" id="kicker">Field notes</div>
+          <h1 id="headline">Ridge Light on the High Road</h1>
+          <p class="meta" id="byline">Northline Journal · 8 min read</p>
+          <img class="hero" id="hero" src="og-ridge.svg" alt="" />
+          <p class="lede" id="lede">
+            The last hour on the ridge is the one the Open Graph image always wants: a hard line of
+            light, a dark slope, and a sky that still holds heat.
+          </p>
+        </article>
+        <div class="popup-wrap" id="popup-wrap">
+          <iframe id="popup" title="OG Downloader popup"></iframe>
+        </div>
+      </div>
+    </div>
+    <script>
+      const scene = new URLSearchParams(location.search).get("scene") || "1";
+      document.body.dataset.scene = scene;
+      const iframe = document.getElementById("popup");
+      const wrap = document.getElementById("popup-wrap");
+      iframe.src = "popup-mock.html?scene=" + scene;
+      if (scene === "2") {
+        wrap.classList.add("scene-2");
+        document.getElementById("tab-title").textContent = "Harbor After Dark";
+        document.getElementById("url").textContent = "northline.journal/stories/harbor-after-dark";
+        document.getElementById("kicker").textContent = "Cities";
+        document.getElementById("headline").textContent = "Harbor After Dark";
+        document.getElementById("byline").textContent = "Northline Journal · Photo essay";
+        document.getElementById("hero").src = "og-harbor.svg";
+        document.getElementById("lede").textContent =
+          "The same page can ship more than one share image. Pick the Open Graph frame, the Twitter crop, or the studio still.";
+      }
+    </script>
+  </body>
+</html>

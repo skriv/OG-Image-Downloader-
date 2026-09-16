@@ -276,11 +276,11 @@
 
   function slugify(text) {
     var value = String(text || "")
-      .replace(/[\/\\:*?"<>|]+/g, "")
-      .replace(/\s+/g, "-")
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
       .replace(/-+/g, "-")
-      .replace(/^[-.]+|[-.]+$/g, "");
-    if (value.length > 80) value = value.slice(0, 80).replace(/[-.]+$/g, "");
+      .replace(/^-+|-+$/g, "");
+    if (value.length > 80) value = value.slice(0, 80).replace(/-+$/g, "");
     return value;
   }
 

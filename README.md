@@ -1,5 +1,7 @@
 # OG Downloader
 
+**Version:** 1.3.0
+
 Chrome extension that reads Open Graph tags on the current tab, downloads the OG image, and can save other pictures from the page.
 
 The popup UI is built with [HeroUI](https://github.com/heroui-inc/heroui) (React + Tailwind) and supports light, dark, and system themes.

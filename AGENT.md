@@ -1,6 +1,8 @@
 # Agent instructions
 
-All git commit messages must be in English only.
+Commit and push workflow: see [`PUSH.md`](PUSH.md).
+
+Chrome Web Store listing notes (description, version, features): see [`STORE.md`](STORE.md).
 
 ## Build
 

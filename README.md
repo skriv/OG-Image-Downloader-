@@ -60,7 +60,11 @@ In priority order:
 
 Title, description, and dimensions are shown when present.
 
-Local parser fixture: serve `test/fixture.html` over HTTP (not `file://`).
+Local parser fixture: `test/fixture.html`. Run the suite with:
+
+```bash
+npm test
+```
 
 ## Permissions
 

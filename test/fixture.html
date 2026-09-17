@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <base href="https://example.test/articles/demo/" />
     <title>Fallback Title</title>
     <meta property="og:title" content="OG Title / Test" />
     <meta property="og:description" content="A sample Open Graph page" />
@@ -30,5 +31,9 @@
   </head>
   <body>
     <h1>OG fixture</h1>
+    <img src="https://cdn.example.com/body.png" width="640" height="360" alt="Body" />
+    <img srcset="https://cdn.example.com/small.jpg 400w, https://cdn.example.com/large.jpg 1200w" />
+    <div style="background-image: url('https://cdn.example.com/bg.webp')"></div>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="10" /></svg>
   </body>
 </html>

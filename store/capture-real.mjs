@@ -24,20 +24,12 @@ const PYTHON = join(STORE, ".venv/bin/python");
 
 const SITES = [
   {
-    id: "apple",
-    url: "https://www.apple.com/",
+    id: "alexkrivov",
+    url: "https://www.alexkrivov.com/",
     scenes: [
       { scene: "main", out: "screenshot-1.png", theme: "light" },
       { scene: "gallery", out: "screenshot-2.png", theme: "light" },
-      { scene: "settings", out: "screenshot-3.png", theme: "light" }
-    ]
-  },
-  {
-    id: "dji",
-    url: "https://www.dji.com/global/mavic-4-pro",
-    scenes: [
-      { scene: "main", out: "screenshot-4.png", theme: "light" },
-      { scene: "gallery", out: "screenshot-5.png", theme: "dark" }
+      { scene: "gallery", out: "screenshot-3.png", theme: "dark", galleryFilter: "all" }
     ]
   }
 ];
@@ -160,7 +152,7 @@ function buildHarnessHtml() {
     .replace("<head>", "<head>" + inject);
 }
 
-async function prepareScene(popup, scene) {
+async function prepareScene(popup, scene, opts = {}) {
   await popup.waitForSelector("text=OG Downloader", { timeout: 30000 });
   await popup
     .waitForFunction(() => {
@@ -181,26 +173,43 @@ async function prepareScene(popup, scene) {
       await allImages.click();
       await popup.waitForTimeout(800);
 
-      // Prefer a compact filter so header + grid + download fit in one frame
-      const compact = popup.locator("span, button, div").filter({ hasText: /^(PNG|GIF|AVIF)\s*\d+$/i });
-      if (await compact.count()) {
-        await compact.first().click().catch(() => {});
-        await popup.waitForTimeout(400);
+      const preferAll = opts.galleryFilter === "all";
+      if (!preferAll) {
+        // Prefer a compact filter so header + grid + download fit in one frame
+        const compact = popup
+          .locator("span, button, div")
+          .filter({ hasText: /^(PNG|GIF|AVIF)\s*\d+$/i });
+        if (await compact.count()) {
+          await compact.first().click().catch(() => {});
+          await popup.waitForTimeout(400);
+        }
+      } else {
+        // Keep All selected — show many thumbnails
+        const allTag = popup
+          .locator("span, button, div")
+          .filter({ hasText: /^All\s*\d+$/i })
+          .first();
+        if (await allTag.count()) {
+          await allTag.click().catch(() => {});
+          await popup.waitForTimeout(300);
+        }
       }
 
       const cells = popup.locator('[class*="aspect-square"]');
       const count = await cells.count();
-      for (let i = 0; i < Math.min(count, 3); i++) {
+      const selectCount = preferAll ? Math.min(count, 6) : Math.min(count, 3);
+      for (let i = 0; i < selectCount; i++) {
         await cells.nth(i).click({ force: true }).catch(() => {});
-        await popup.waitForTimeout(120);
+        await popup.waitForTimeout(80);
       }
 
-      // Open per-image menu on first cell if SVG filter active (shows Copy SVG)
-      const more = cells.first().locator("button").first();
-      if (await more.count()) {
-        await cells.first().hover().catch(() => {});
-        await more.click({ force: true }).catch(() => {});
-        await popup.waitForTimeout(300);
+      if (!preferAll) {
+        const more = cells.first().locator("button").first();
+        if (await more.count()) {
+          await cells.first().hover().catch(() => {});
+          await more.click({ force: true }).catch(() => {});
+          await popup.waitForTimeout(300);
+        }
       }
 
       const zipTrigger = popup.getByLabel(/More download options/i);
@@ -308,7 +317,7 @@ async function main() {
         }, payload);
 
         await popup.goto(harness, { waitUntil: "networkidle", timeout: 90000 });
-        await prepareScene(popup, cfg.scene);
+        await prepareScene(popup, cfg.scene, cfg);
 
         // Wait for preview image if present
         const img = popup.locator("img").first();
@@ -328,7 +337,31 @@ async function main() {
         await popup.waitForTimeout(500);
 
         if (cfg.scene === "gallery") {
+          const showMany = cfg.galleryFilter === "all";
           await popup.evaluate(() => window.scrollTo(0, 0));
+          if (showMany) {
+            // Shrink OG block so the grid of thumbnails dominates the frame
+            await popup.evaluate(() => {
+              document.querySelectorAll(".og-preview-frame").forEach((el) => {
+                el.style.maxHeight = "56px";
+                el.style.overflow = "hidden";
+              });
+              document
+                .querySelectorAll("h1, [class*='line-clamp'], .line-clamp-2")
+                .forEach((el) => {
+                  el.style.display = "none";
+                });
+            });
+            await popup.waitForTimeout(200);
+            // Wait for several thumbnails to load
+            await popup
+              .waitForFunction(() => {
+                const imgs = [...document.querySelectorAll('[class*="aspect-square"] img')];
+                const ready = imgs.filter((i) => i.complete && i.naturalWidth > 0).length;
+                return ready >= Math.min(9, imgs.length);
+              }, null, { timeout: 8000 })
+              .catch(() => {});
+          }
           let bottom = await popup.evaluate(() => {
             const downloadBtns = [...document.querySelectorAll("button")].filter((b) =>
               /Download/i.test(b.textContent || "")
@@ -336,7 +369,7 @@ async function main() {
             const dl = downloadBtns[downloadBtns.length - 1];
             return dl ? dl.getBoundingClientRect().bottom + 24 : 820;
           });
-          if (bottom > 860) {
+          if (bottom > 860 && !showMany) {
             await popup.evaluate(() => {
               document.querySelectorAll(".og-preview-frame").forEach((el) => {
                 el.style.maxHeight = "72px";
@@ -355,15 +388,15 @@ async function main() {
               return dl ? dl.getBoundingClientRect().bottom + 24 : 820;
             });
           }
-          await popup.setViewportSize({
-            width: 360,
-            height: Math.ceil(Math.min(Math.max(bottom, 560), 860))
-          });
+          const height = showMany
+            ? Math.ceil(Math.min(Math.max(bottom, 720), 900))
+            : Math.ceil(Math.min(Math.max(bottom, 560), 860));
+          await popup.setViewportSize({ width: 360, height });
           await popup.waitForTimeout(200);
           await popup.evaluate(() => window.scrollTo(0, 0));
-          const popupShot = join(OUT, `${site.id}-${cfg.scene}-popup.png`);
-          await popup.screenshot({ path: popupShot, type: "png", animations: "disabled" });
-          compose(pageShot, popupShot, join(STORE, cfg.out), { center: false });
+          const shotPath = join(OUT, `${site.id}-${cfg.out.replace(".png", "")}-popup.png`);
+          await popup.screenshot({ path: shotPath, type: "png", animations: "disabled" });
+          compose(pageShot, shotPath, join(STORE, cfg.out), { center: false });
           outputs.push(cfg.out);
           await popup.close();
           continue;

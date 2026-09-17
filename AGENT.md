@@ -14,6 +14,24 @@ npm run build
 
 Do not ask the user to rebuild unless the build fails and you cannot fix it.
 
+## Tests
+
+Automated tests live in `test/*.test.mjs` and run with Node’s built-in test runner:
+
+```bash
+npm test
+```
+
+Rules for every code change:
+
+1. **Run tests before finishing.** After fixing a bug or adding a feature, run `npm test`. Do not hand the work back while tests are failing.
+2. **Add or extend tests with the change.** New behavior, bug fixes, and regressions need coverage in the matching suite (`extract`, `filename`, `download`, `zip`, `preview-i18n`, or a new focused file). Prefer one clear test per functional behavior.
+3. **Keep pure logic in `src/shared/`** so it can be unit-tested without Chrome. Background/popup wiring may stay thin.
+4. **Download/CDN bugs** must cover candidate URL building, image sniffing (reject HTML bodies), and filename extension correction — these are the failure modes behind Chrome’s “Site wasn’t available” / `.html` downloads.
+5. Fixture HTML for DOM extraction is `test/fixture.html`. Playwright launches the system Chrome channel (`channel: "chrome"`) for extract tests so agents do not need `npx playwright install` unless that channel is unavailable.
+
+If you touch download, extract, filename, zip, or i18n helpers and skip tests, the change is incomplete.
+
 ## Фронтенд UI: сначала skills, потом код
 
 При любом построении, правке, ревью или полировке UI на фронте сначала прочитай и следуй skills из `.agents/skills/`. Не собирай интерфейс «из головы»: неверные easing, сплошные бордеры вместо полупрозрачных теней, слабая типографика и промахи по a11y — это то, от чего эти skills как раз защищают.

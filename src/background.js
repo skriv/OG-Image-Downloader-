@@ -1,8 +1,16 @@
 "use strict";
 
-import { t, loadLocale, resolveLocale, setCurrentLocale } from "./shared/i18n.js";
+import { t, loadLocale, setCurrentLocale } from "./shared/i18n.js";
 import { extractOpenGraph, buildFilename, isRestrictedUrl } from "./shared/extract.js";
 import { buildZip } from "./shared/zip.js";
+import {
+  ensureImageFilename,
+  resolveImageDownload,
+  fetchImageBytes,
+  buildDownloadCandidates,
+  bytesToDataUrl,
+  canCreateObjectUrl
+} from "./shared/download.js";
 
 var MENU_ID = "download-og-image";
 var menuQueue = Promise.resolve();
@@ -96,34 +104,123 @@ function timeoutSignal(ms) {
   return { signal: controller.signal, cancel: function () { clearTimeout(timer); } };
 }
 
-async function probeImage(url) {
+async function probeImage(url, pageUrl) {
   if (!url || url.indexOf("data:") === 0) return null;
-  var head = timeoutSignal(4000);
-  try {
-    var response = await fetch(url, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: head.signal
-    });
-    if (response.ok) {
-      var type = response.headers.get("content-type");
-      var length = response.headers.get("content-length");
-      if (type || length) {
-        return {
-          type: type,
-          size: length ? Number(length) : null
-        };
+  var candidates = buildDownloadCandidates(url, pageUrl);
+  for (var i = 0; i < candidates.length; i++) {
+    var head = timeoutSignal(4000);
+    try {
+      var response = await fetch(candidates[i], {
+        method: "HEAD",
+        redirect: "follow",
+        signal: head.signal,
+        credentials: "omit",
+        referrerPolicy: "no-referrer"
+      });
+      if (response.ok) {
+        var type = response.headers.get("content-type");
+        var length = response.headers.get("content-length");
+        if (type || length) {
+          return {
+            type: type,
+            size: length ? Number(length) : null,
+            url: candidates[i]
+          };
+        }
       }
+    } catch (err) {
+      /* HEAD is often blocked; GET fallback is too heavy for a probe */
+    } finally {
+      head.cancel();
     }
-  } catch (err) {
-    /* HEAD is often blocked; GET fallback is too heavy for a probe */
-  } finally {
-    head.cancel();
   }
   return null;
 }
 
-async function downloadWithFallback(url, filename) {
+async function saveBytesAsDownload(bytes, mime, filename) {
+  // Prefer data: URLs — URL.createObjectURL is missing in MV3 service workers,
+  // and calling it before a try/catch previously aborted successful fetches.
+  var dataUrl = bytesToDataUrl(bytes, mime);
+  try {
+    var dataId = await chrome.downloads.download({
+      url: dataUrl,
+      filename: filename,
+      saveAs: false,
+      conflictAction: "uniquify"
+    });
+    return { ok: true, id: dataId };
+  } catch (dataErr) {
+    if (!canCreateObjectUrl()) {
+      throw dataErr;
+    }
+    var blob = new Blob([bytes], { type: mime || "application/octet-stream" });
+    var objectUrl = URL.createObjectURL(blob);
+    try {
+      var id = await chrome.downloads.download({
+        url: objectUrl,
+        filename: filename,
+        saveAs: false,
+        conflictAction: "uniquify"
+      });
+      setTimeout(function () {
+        URL.revokeObjectURL(objectUrl);
+      }, 60000);
+      return { ok: true, id: id };
+    } catch (err) {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (revokeErr) {
+        /* ignore */
+      }
+      var fallbackUrl = await blobToDataUrl(blob);
+      var fallbackId = await chrome.downloads.download({
+        url: fallbackUrl,
+        filename: filename,
+        saveAs: false,
+        conflictAction: "uniquify"
+      });
+      return { ok: true, id: fallbackId };
+    }
+  }
+}
+
+function waitForDownloadTerminal(downloadId, timeoutMs) {
+  return new Promise(function (resolve) {
+    var done = false;
+    var timer = setTimeout(function () {
+      finish({ ok: false, errorKey: "downloadFailed" });
+    }, timeoutMs || 30000);
+
+    function finish(result) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      chrome.downloads.onChanged.removeListener(onChanged);
+      resolve(result);
+    }
+
+    function onChanged(delta) {
+      if (!delta || delta.id !== downloadId) return;
+      if (delta.state && delta.state.current === "complete") {
+        finish({ ok: true, id: downloadId });
+        return;
+      }
+      if (delta.state && delta.state.current === "interrupted") {
+        finish({ ok: false, errorKey: "downloadFailed" });
+      }
+    }
+
+    chrome.downloads.onChanged.addListener(onChanged);
+    chrome.downloads.search({ id: downloadId }, function (items) {
+      var item = items && items[0];
+      if (!item) return;
+      if (item.state === "complete") finish({ ok: true, id: downloadId });
+      if (item.state === "interrupted") finish({ ok: false, errorKey: "downloadFailed" });
+    });
+  });
+}
+
+async function downloadDirectRemote(url, filename) {
   try {
     var id = await chrome.downloads.download({
       url: url,
@@ -131,41 +228,49 @@ async function downloadWithFallback(url, filename) {
       saveAs: false,
       conflictAction: "uniquify"
     });
-    return { ok: true, id: id };
+    return waitForDownloadTerminal(id, 25000);
   } catch (err) {
-    if (url.indexOf("data:") === 0) {
+    return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
+  }
+}
+
+async function downloadWithFallback(url, filename, pageUrl) {
+  if (!url) {
+    return { ok: false, errorKey: "downloadFailed", error: t("downloadFailed") };
+  }
+
+  var resolved = await resolveImageDownload(url, pageUrl);
+  if (resolved.ok) {
+    var finalName = ensureImageFilename(filename, resolved.mime, resolved.url, resolved.bytes);
+    try {
+      return await saveBytesAsDownload(
+        resolved.bytes,
+        resolved.mime || "application/octet-stream",
+        finalName
+      );
+    } catch (err) {
       return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
     }
   }
 
-  var get = timeoutSignal(20000);
-  try {
-    var response = await fetch(url, {
-      redirect: "follow",
-      signal: get.signal
-    });
-    if (!response.ok) {
-      return {
-        ok: false,
-        errorKey: "serverStatus",
-        errorVars: { status: response.status },
-        error: t("serverStatus", { status: response.status })
-      };
-    }
-    var blob = await response.blob();
-    var dataUrl = await blobToDataUrl(blob);
-    var id = await chrome.downloads.download({
-      url: dataUrl,
-      filename: filename,
-      saveAs: false,
-      conflictAction: "uniquify"
-    });
-    return { ok: true, id: id };
-  } catch (err) {
-    return { ok: false, errorKey: "downloadFailed", error: err.message || t("downloadFailed") };
-  } finally {
-    get.cancel();
+  // Last resort: let Chrome fetch the remote URL, but only accept a completed download.
+  var candidates = buildDownloadCandidates(url, pageUrl);
+  for (var i = 0; i < candidates.length; i++) {
+    var direct = await downloadDirectRemote(candidates[i], filename);
+    if (direct && direct.ok) return direct;
   }
+
+  if (resolved.error && String(resolved.error).indexOf("status-") === 0) {
+    var status = String(resolved.error).slice("status-".length);
+    return {
+      ok: false,
+      errorKey: "serverStatus",
+      errorVars: { status: status },
+      error: t("serverStatus", { status: status })
+    };
+  }
+
+  return { ok: false, errorKey: "downloadFailed", error: t("downloadFailed") };
 }
 
 async function extractFromTab(tabId) {
@@ -196,7 +301,11 @@ async function downloadFromTab(tab) {
       flashBadge("!");
       return { ok: false, errorKey: "noOgImage", error: t("noOgImage") };
     }
-    var result = await downloadWithFallback(image.url, buildFilename(data, image));
+    var result = await downloadWithFallback(
+      image.url,
+      buildFilename(data, image),
+      (data && data.pageUrl) || tab.url
+    );
     flashBadge(result.ok ? "OK" : "!");
     return result;
   } catch (err) {
@@ -214,17 +323,22 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return;
 
   if (message.type === "probe") {
-    probeImage(message.url).then(sendResponse);
+    probeImage(message.url, message.pageUrl).then(sendResponse);
     return true;
   }
 
   if (message.type === "download") {
-    downloadWithFallback(message.url, message.filename).then(sendResponse);
+    downloadWithFallback(message.url, message.filename, message.pageUrl).then(sendResponse);
     return true;
   }
 
   if (message.type === "downloadMany") {
-    downloadMany(message.items || [], Boolean(message.zip), message.zipName || "images.zip").then(sendResponse);
+    downloadMany(
+      message.items || [],
+      Boolean(message.zip),
+      message.zipName || "images.zip",
+      message.pageUrl
+    ).then(sendResponse);
     return true;
   }
 });
@@ -235,24 +349,17 @@ function notifyPopup(payload) {
   });
 }
 
-async function fetchBytes(url) {
+async function fetchBytes(url, pageUrl) {
   if (url.indexOf("data:") === 0) {
-    var res = await fetch(url);
-    var buf = await res.arrayBuffer();
-    return new Uint8Array(buf);
+    var payload = await fetchImageBytes(url);
+    return payload.bytes;
   }
-  var get = timeoutSignal(20000);
-  try {
-    var response = await fetch(url, { redirect: "follow", signal: get.signal });
-    if (!response.ok) throw new Error(String(response.status));
-    var buffer = await response.arrayBuffer();
-    return new Uint8Array(buffer);
-  } finally {
-    get.cancel();
-  }
+  var resolved = await resolveImageDownload(url, pageUrl);
+  if (!resolved.ok) throw new Error(resolved.error || "downloadFailed");
+  return resolved.bytes;
 }
 
-async function downloadMany(items, zip, zipName) {
+async function downloadMany(items, zip, zipName, pageUrl) {
   if (!items.length) {
     return { ok: false, errorKey: "noneSelected" };
   }
@@ -266,9 +373,15 @@ async function downloadMany(items, zip, zipName) {
         total: items.length
       });
       try {
+        var bytes = await fetchBytes(items[i].url, pageUrl);
         files.push({
-          name: items[i].filename || "image-" + (i + 1) + ".jpg",
-          bytes: await fetchBytes(items[i].url)
+          name: ensureImageFilename(
+            items[i].filename || "image-" + (i + 1) + ".jpg",
+            null,
+            items[i].url,
+            bytes
+          ),
+          bytes: bytes
         });
       } catch (err) {
         /* skip failed fetches */
@@ -276,29 +389,11 @@ async function downloadMany(items, zip, zipName) {
     }
     if (!files.length) return { ok: false, errorKey: "downloadFailed" };
     var zipBytes = buildZip(files);
-    var blob = new Blob([zipBytes], { type: "application/zip" });
-    var objectUrl = URL.createObjectURL(blob);
     try {
-      var id = await chrome.downloads.download({
-        url: objectUrl,
-        filename: zipName,
-        saveAs: false,
-        conflictAction: "uniquify"
-      });
-      return { ok: true, zip: true, id: id, count: files.length, total: items.length };
+      var saved = await saveBytesAsDownload(zipBytes, "application/zip", zipName);
+      return { ok: true, zip: true, id: saved.id, count: files.length, total: items.length };
     } catch (err) {
-      var dataUrl = await blobToDataUrl(blob);
-      var zipId = await chrome.downloads.download({
-        url: dataUrl,
-        filename: zipName,
-        saveAs: false,
-        conflictAction: "uniquify"
-      });
-      return { ok: true, zip: true, id: zipId, count: files.length, total: items.length };
-    } finally {
-      setTimeout(function () {
-        URL.revokeObjectURL(objectUrl);
-      }, 60000);
+      return { ok: false, errorKey: "downloadFailed" };
     }
   }
 
@@ -309,7 +404,7 @@ async function downloadMany(items, zip, zipName) {
       current: d + 1,
       total: items.length
     });
-    var result = await downloadWithFallback(items[d].url, items[d].filename);
+    var result = await downloadWithFallback(items[d].url, items[d].filename, pageUrl);
     if (result && result.ok) ok += 1;
     await new Promise(function (resolve) {
       setTimeout(resolve, 120);

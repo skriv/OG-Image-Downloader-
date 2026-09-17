@@ -89,17 +89,23 @@ export default function App() {
     setPreviewKey((k) => k + 1);
   }, [data]);
 
-  const probeSelected = useCallback((target) => {
-    if (!target || !target.url) return;
-    chrome.runtime.sendMessage({ type: "probe", url: target.url }, (info) => {
-      if (chrome.runtime.lastError) return;
-      setProbe(info || null);
-    });
-  }, []);
+  const probeSelected = useCallback(
+    (target, pageUrl) => {
+      if (!target || !target.url) return;
+      chrome.runtime.sendMessage(
+        { type: "probe", url: target.url, pageUrl: pageUrl || null },
+        (info) => {
+          if (chrome.runtime.lastError) return;
+          setProbe(info || null);
+        }
+      );
+    },
+    []
+  );
 
   useEffect(() => {
-    if (view === "content" && image) probeSelected(image);
-  }, [view, image && image.url, probeSelected]);
+    if (view === "content" && image) probeSelected(image, data && data.pageUrl);
+  }, [view, image && image.url, data && data.pageUrl, probeSelected]);
 
   const loadPage = useCallback(async () => {
     setStatusMsg("");
@@ -213,7 +219,8 @@ export default function App() {
       type: "download",
       url: image.url,
       filename: buildFilename(data, image, probe && probe.type),
-      mime: (probe && probe.type) || image.type || ""
+      mime: (probe && probe.type) || image.type || "",
+      pageUrl: data.pageUrl || null
     });
     setBusy(false);
     if (!result || !result.ok) {
@@ -291,7 +298,8 @@ export default function App() {
       type: "downloadMany",
       items: toDownloadItems(images),
       zip: Boolean(zip),
-      zipName: zipName()
+      zipName: zipName(),
+      pageUrl: (data && data.pageUrl) || null
     });
     setBatchBusy(false);
     if (!result || !result.ok) {

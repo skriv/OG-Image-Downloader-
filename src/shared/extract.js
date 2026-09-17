@@ -14,6 +14,17 @@ var MIME_EXT = {
   "image/x-icon": "ico"
 };
 
+var IMAGE_TYPES = {
+  avif: true,
+  bmp: true,
+  gif: true,
+  ico: true,
+  jpg: true,
+  png: true,
+  svg: true,
+  webp: true
+};
+
 export function extractOpenGraph() {
   var JSON_LD_TYPES = {
     article: true,
@@ -492,12 +503,13 @@ function slugFromUrl(url) {
 
 export function buildFilename(data, image, mime) {
   var host = slugify((data && data.host) || "page") || "page";
-  var ext =
+  var rawExt =
     extensionFromUrl(image && image.url) ||
     extensionFromMime(mime) ||
     extensionFromMime(image && image.type) ||
-    (image && image.type && image.type !== "other" && image.type !== "unknown" ? image.type : null) ||
+    (image && image.type && IMAGE_TYPES[image.type] ? image.type : null) ||
     "jpg";
+  var ext = IMAGE_TYPES[rawExt] ? rawExt : "jpg";
   var fromUrl = slugFromUrl(image && image.url);
   var title;
   if (image && (image.isOg || (image.source && String(image.source).indexOf("og:") === 0))) {
